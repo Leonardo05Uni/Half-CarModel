@@ -43,6 +43,7 @@ results = car.simulate(duration=5.0, dt=0.01)
 
 #### Run Example Simulation
 
+Basic example:
 ```bash
 python example_simulation.py
 ```
@@ -52,6 +53,17 @@ This will:
 2. Simulate the car motion for 5 seconds
 3. Generate plots showing wheel positions, velocities, and suspension displacement
 4. Save results to `simulation_results.png`
+
+Advanced examples with various scenarios:
+```bash
+python advanced_examples.py
+```
+
+This demonstrates:
+1. **Sinusoidal road profile**: Smooth periodic bumps
+2. **Speed bump scenario**: Response to a single large bump
+3. **Random rough road**: Realistic road surface with multiple frequencies
+4. **Damping comparison**: Effect of different damping coefficients on ride quality
 
 ### Road Profile CSV Format
 
@@ -127,7 +139,9 @@ car.set_road_profile(distance, height)
 ### Files
 
 - `car_model.py`: Core framework with WheelModel and CarModel classes
-- `example_simulation.py`: Example script demonstrating the framework
+- `example_simulation.py`: Basic example script demonstrating the framework
+- `advanced_examples.py`: Advanced examples with various road scenarios
+- `test_framework.py`: Test suite for validating framework functionality
 - `example_road_profile.csv`: Sample road profile data
 - `requirements.txt`: Python package dependencies
 

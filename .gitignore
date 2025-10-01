@@ -27,6 +27,10 @@ env/
 
 # Simulation outputs (generated files)
 simulation_results.png
+example_sinusoidal.png
+example_speed_bump.png
+example_rough_road.png
+example_damping_comparison.png
 
 # IDE
 .vscode/
