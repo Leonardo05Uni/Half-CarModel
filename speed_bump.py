@@ -11,7 +11,7 @@ h=np.where((x>=0)&(x<=bump_L), 0.5*bump_H*(1-np.cos(2*np.pi*x/bump_L)),0) # func
 plt.figure(figsize=(bump_H+5,bump_L+5)) # figure size that displayed
 plt.plot(x,h,color='black',linewidth=1) # color and linewidth of the graph
 plt.xlim(x_center-margin, x_center+margin) # centre the plot, range of x axis
-plt.ylim(0,1) # range of y axis
+plt.ylim(0,2.5) # range of y axis
 plt.tight_layout()
 plt.axis("off") # hide the axis, make it clearer
 plt.show()
