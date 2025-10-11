@@ -133,7 +133,7 @@ def run_simulation(p: CarParams, base: BaseInput, opts: SimulationOptions):
 
 
 # ----------------------------
-# Analysis helpers
+# Analysis
 # ----------------------------
 
 # This function was done by GPT
