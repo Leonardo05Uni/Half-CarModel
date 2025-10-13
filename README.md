@@ -18,7 +18,7 @@ _dot - differentiated
 _f - front of car
 _r - rear of car
 
-Component / Positions Names (number reference those found in figure 1 on 'Model drawing - car v1.png')
+Component / Positions Names (number reference those found in figure 1 on 'Model drawing - car v2.png')
 1 - RWS - rear wheel spring
 2 - RWD - rear wheel damper
 3 - RWC - rear wheel centre
