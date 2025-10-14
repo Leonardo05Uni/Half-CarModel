@@ -66,13 +66,13 @@ def build_matrices_mck(p: CarParams):
     c_f, c_r = p.FWD_c, p.RWD_c
 
     M = np.array([[m, 0.0],
-                  [0.0, I]], dtype=float)
+                  [0.0, I]], dtype = float)
 
     C = np.array([[c_f + c_r, a*c_f - b*c_r],
-                  [a*c_f - b*c_r, a*a*c_f + b*b*c_r]], dtype=float)
+                  [a*c_f - b*c_r, a*a*c_f + b*b*c_r]], dtype = float)
 
     K = np.array([[k_f + k_r, a*k_f - b*k_r],
-                  [a*k_f - b*k_r, a*a*k_f + b*b*k_r]], dtype=float)
+                  [a*k_f - b*k_r, a*a*k_f + b*b*k_r]], dtype = float)
 
     return M, C, K
 
@@ -105,8 +105,8 @@ def rhs_car(t, x, p: CarParams, base: BaseInput):
     F_r = k_r*dL_r + c_r*dL_r_dot
 
     # Rigid-body equations (heave & pitch)
-    z_dot_dot      = -(F_f + F_r) / p.body_M # Negative sign due to restoring force driving body down
-    theta_dot_dot  = -(a*F_f - b*F_r) / p.body_inertia # Again restoring moments causes the negative sign
+    z_dot_dot = -(F_f + F_r) / p.body_M # Negative sign due to restoring force driving body down
+    theta_dot_dot = -(a*F_f - b*F_r) / p.body_inertia # Again restoring moments causes the negative sign
 
     return [z_dot, theta_dot, z_dot_dot, theta_dot_dot]  # Intentionally keep order [ż, θ, z̈, θ̈] to later put in ODE solver solve_ivp
 
