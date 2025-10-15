@@ -4,7 +4,7 @@ import pandas as pd
 import random
 
 def generate_bumpy_road(length=100, resolution=0.01, incline=0,
-                        bump_height=0.1, bump_width=0.2,
+                        bump_height=0.1, bump_width=0.8,
                         pothole_depth=0.1, pothole_width=2,
                         num_bumps=1, num_potholes=4, imperfection=0.01):
     """
@@ -33,7 +33,15 @@ def generate_bumpy_road(length=100, resolution=0.01, incline=0,
 
     # Add speed bumps (modeled as Gaussian curves)
     for pos in bump_positions:
-        y += bump_height * np.exp(-0.5 * ((x - pos) / (bump_width / 2)) ** 2)
+        
+        x_local = (x - pos) / (bump_width / 2)
+        
+        n = 4 
+        y_bump = bump_height * (1 - x_local**n)  
+        y_bump[x_local < -1] = 0
+        y_bump[x_local > 1] = 0
+        
+        y += y_bump
 
     # Flat potholes
     for pos in pothole_positions:
@@ -78,6 +86,8 @@ def plot_road(df, x_base, y_base, bump_positions, pothole_positions):
 
     # Plot baseline (without imperfections)
     plt.plot(x_base, y_base, color='red', linewidth=1.5, alpha=0.7, label='Baseline', linestyle='--')
+
+    plt.ylim(-0.5, 0.5)
 
     plt.legend()
     plt.show()
