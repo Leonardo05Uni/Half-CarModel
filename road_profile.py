@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import random
+
 
 def generate_bumpy_road(length=100, resolution=0.01, incline=0,
                         bump_height=0.1, bump_width=0.8,
@@ -63,7 +63,7 @@ def generate_bumpy_road(length=100, resolution=0.01, incline=0,
     # Add random imperfections
     bumpy_y = []
     for pos in range(len(y)):
-        bumpy_y.append(random.uniform(y[pos] - imperfection, y[pos] + imperfection))
+        bumpy_y.append(np.random.uniform(y[pos] - imperfection, y[pos] + imperfection))
 
     # Create DataFrame with proper structure
     df = pd.DataFrame({'distance': x, 'height': bumpy_y})
