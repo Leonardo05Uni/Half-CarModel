@@ -6,7 +6,7 @@ import random
 def generate_bumpy_road(length=100, resolution=0.01, incline=0,
                         bump_height=0.1, bump_width=0.8,
                         pothole_depth=0.1, pothole_width=2,
-                        num_bumps=1, num_potholes=4, imperfection=0.01):
+                        num_bumps=2, num_potholes=3, imperfection=0.01):
     """
 
     Parameters:
