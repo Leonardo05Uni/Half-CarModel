@@ -9,7 +9,6 @@ import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
-
 # ----------------------------
 # Data containers
 # ----------------------------
@@ -50,7 +49,6 @@ BaseInput = Callable[[float], Tuple[float, float, float, float]]
 def zero_base(_: float) -> Tuple[float, float, float, float]:
     """Flat road: zero displacement/velocity at both wheels."""
     return 0.0, 0.0, 0.0, 0.0 # (y_f, y_r, y_f_dot, y_r_dot)
-
 
 # ----------------------------
 # System matrices (for modal checks)
