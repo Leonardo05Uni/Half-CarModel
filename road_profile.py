@@ -4,7 +4,7 @@ import pandas as pd
 
 
 def generate_bumpy_road(length=100, resolution=0.01, incline=0,
-                        bump_height=0.1, bump_width=0.8,
+                        bump_height=0.1, bump_width=1.2,
                         pothole_depth=0.1, pothole_width=2,
                         num_bumps=2, num_potholes=3, imperfection=0.01):
     """
@@ -13,8 +13,10 @@ def generate_bumpy_road(length=100, resolution=0.01, incline=0,
         length (float): Total length of the road (m)
         resolution (float): Distance step (m)
         incline (float): Slope of the road (rise/run)
-        bump_height (float): Height of speed bumps (m)
+        bump_height (float): Height of speed bumps (m) 
+            - Max speed bump height is 0.1m (https://streetsolutionsuk.co.uk/blogs/news/the-ultimate-guide-to-speed-bump-regulations-uk)
         bump_width (float): Width of speed bumps (m)
+            - Minimum length of speed bumps is 0.9cm (https://streetsolutionsuk.co.uk/blogs/news/the-ultimate-guide-to-speed-bump-regulations-uk)
         pothole_depth (float): Depth of potholes (m)
         pothole_width (float): Width of potholes (m)
         num_bumps (int): Number of speed bumps
@@ -35,12 +37,26 @@ def generate_bumpy_road(length=100, resolution=0.01, incline=0,
     for pos in bump_positions:
         
         x_local = (x - pos) / (bump_width / 2)
+    
+        #Step height is 0.025m (https://streetsolutionsuk.co.uk/blogs/news/the-ultimate-guide-to-speed-bump-regulations-uk)
+        step_height = 0.025
+
+        n = 2  
+        core_bump = (1 - x_local**n) * (bump_height - step_height)
+        core_bump[np.abs(x_local) > 1] = 0  
+
+        y_bump = np.copy(core_bump)
+
+
+        left_edge = pos - bump_width / 2
+        right_edge = pos + bump_width / 2
+
         
-        n = 4 
-        y_bump = bump_height * (1 - x_local**n)  
-        y_bump[x_local < -1] = 0
-        y_bump[x_local > 1] = 0
+        y_bump[x >= left_edge] += step_height
+
         
+        y_bump[x >= right_edge] -= step_height
+
         y += y_bump
 
     # Flat potholes
@@ -72,7 +88,7 @@ def generate_bumpy_road(length=100, resolution=0.01, incline=0,
     return df, x, y, bump_positions, pothole_positions
 
 
-def plot_road(df, x_base, y_base, bump_positions, pothole_positions):
+def plot_road(df, x_base, y_base):
     plt.figure(figsize=(12, 5))
     
 
@@ -95,4 +111,4 @@ def plot_road(df, x_base, y_base, bump_positions, pothole_positions):
 
 # Generate road and plot
 df, x, y, bumps, potholes = generate_bumpy_road()
-plot_road(df, x, y, bumps, potholes)
+plot_road(df, x, y)
