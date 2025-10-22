@@ -22,10 +22,18 @@ def h(x): # Height of the bump at position x
     h_val = np.where((x >= 0) & (x <= bump_L),0.5 * bump_H * (1 - np.cos(2 * np.pi * x / bump_L)),0)
     return h_val
 # Time derivative h_dot(x)
+"""
+Notes:
+    dh/dx = (pi*H/L)*sin(2*pi*x/L)
+    to get dh/dt, multiply by dx/dt (dh/dx * dx/dt).
+    dx/dt is just the speed.
+    so y_f_dot and y_r_dot will just be their value of dh/dx * speed.
+"""
 def h_dot(x, speed): #Vertical velocity (dh/dt) at position x for given horizontal speed.
     x = np.array(x)
     dh_dx = np.where((x >= 0) & (x <= bump_L),(np.pi * bump_H / bump_L) * np.sin(2 * np.pi * x / bump_L),0)
     return dh_dx * speed
+
 # Main function: series output
 def speed_bump_series(L_a, L_b, speed_mph, dt=0.01):
     """
@@ -33,11 +41,6 @@ def speed_bump_series(L_a, L_b, speed_mph, dt=0.01):
     - L_a, L_b: distance from CG to front/rear axle (m)
     - speed_mph: vehicle speed in mph
     - dt: timestep (s)
-    Notes:
-    dh/dx = (pi*H/L)*sin(2*pi*x/L)
-    to get dh/dt, multiply by dx/dt (dh/dx * dx/dt).
-    dx/dt is just the speed.
-    so y_f_dot and y_r_dot will just be their value of dh/dx * speed.
     """
     speed = speed_mph / 2.237  # mph → m/s
     car_L = L_a + L_b
