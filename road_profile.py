@@ -6,7 +6,7 @@ import pandas as pd
 def generate_bumpy_road(length=100, resolution=0.01, incline=0,
                         bump_height=0.1, bump_width=1.2,
                         pothole_depth=0.1, pothole_width=2,
-                        num_bumps=2, num_potholes=3, imperfection=0.01):
+                        num_bumps=2, num_potholes=1, imperfection=0.01):
     """
 
     Parameters:
@@ -17,7 +17,8 @@ def generate_bumpy_road(length=100, resolution=0.01, incline=0,
             - Max speed bump height is 0.1m (https://streetsolutionsuk.co.uk/blogs/news/the-ultimate-guide-to-speed-bump-regulations-uk)
         bump_width (float): Width of speed bumps (m)
             - Minimum length of speed bumps is 0.9cm (https://streetsolutionsuk.co.uk/blogs/news/the-ultimate-guide-to-speed-bump-regulations-uk)
-        pothole_depth (float): Depth of potholes (m)
+        pothole_depth (float): Depth of potholes (m) 
+            - Larger than 40mm is considered a pothole (https://www.darlington.gov.uk/transport-roads-and-parking/highways/potholes)
         pothole_width (float): Width of potholes (m)
         num_bumps (int): Number of speed bumps
         num_potholes (int): Number of potholes
@@ -62,7 +63,7 @@ def generate_bumpy_road(length=100, resolution=0.01, incline=0,
     # Flat potholes
     for pos in pothole_positions:
         half_w = pothole_width / 2
-        transition = half_w * 0.10  # 10% of width used to model smoothish dip
+        transition = half_w * 0.10  # 10% of width used to model smooth dip
 
         # Flat section at the bottom of pothole
         inside = (x > pos - half_w + transition) & (x < pos + half_w - transition)
