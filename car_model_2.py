@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 @dataclass
 class CarParams:
-    """All physical parameters of the 2-DOF car body model."""
+    """All physical parameters of the 4-DOF car body model."""
     body_M: float
     body_inertia: float
     body_a: float
@@ -21,6 +21,10 @@ class CarParams:
     FWP_z: float
     RWP_theta: float
     RWP_z: float
+    m_wf: float            # front unsprung mass [kg]
+    m_wr: float            # rear unsprung mass [kg]
+    k_tf: float            # front tyre stiffness [N/m]
+    k_tr: float            # rear tyre stiffness [N/m]
 
 
 @dataclass
@@ -66,31 +70,49 @@ def build_matrices_mck(p: CarParams):
 # We are computing [ż, θ, z̈, θ̈] to feed into our ODE
 def rhs_car(t, x, p: CarParams, base: BaseInput):
     """
-    State x = [z, theta, z_dot, theta_dot].
+    State x = [ z, theta, z_wf, z_wr,  z_dot, theta_dot, z_wf_dot, z_wr_dot ].
     Equations from force/moment balance on body with front/rear spring-dampers.
     """
-    z, theta, z_dot, theta_dot = x
+    z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = x
     y_f, y_r, y_f_dot, y_r_dot = base(t)
 
     a, b = p.body_a, p.body_b
     k_f, k_r = p.FWS_k, p.RWS_k
     c_f, c_r = p.FWD_c, p.RWD_c
+    M, I = p.body_M, p.body_inertia
+    m_wf, m_wr = p.m_wf, p.m_wr
+    k_tf, k_tr = p.k_tf, p.k_tr
 
     # Relative spring/damper deflections at front/rear (small-angle)
-    dL_f = (z + a*theta) - y_f
-    dL_r = (z - b*theta) - y_r
-    dL_f_dot = (z_dot + a*theta_dot) - y_f_dot # The time derivatives are needed for viscous damper forces later
-    dL_r_dot = (z_dot - b*theta_dot) - y_r_dot
+    dL_f = (z + a*theta) - z_wf
+    dL_f_dot = (z_dot + a*theta_dot) - z_wf_dot
+    dL_r = (z - b*theta) - z_wr
+    dL_r_dot = (z_dot - b*theta_dot) - z_wr_dot
 
     # Spring-damper forces on body (taking positive "up" in dL, then restoring sign in EOM)
-    F_f = k_f*dL_f + c_f*dL_f_dot
-    F_r = k_r*dL_r + c_r*dL_r_dot
+    F_s_f = k_f * dL_f + c_f * dL_f_dot
+    F_s_r = k_r * dL_r + c_r * dL_r_dot
+
+    F_t_f = k_tf * (y_f - z_wf)
+    F_t_r = k_tr * (y_r - z_wr)
 
     # Rigid-body equations (heave & pitch)
-    z_dot_dot = -(F_f + F_r) / p.body_M # Negative sign due to restoring force driving body down
-    theta_dot_dot = -(a*F_f - b*F_r) / p.body_inertia # Again restoring moments causes the negative sign
+    z_dot_dot = -(F_s_f + F_s_r) / M # Negative sign due to restoring force driving body down
+    theta_dot_dot = -(a*F_s_f - b*F_s_r) / I # Again restoring moments causes the negative sign
 
-    return [z_dot, theta_dot, z_dot_dot, theta_dot_dot]  # Intentionally keep order [ż, θ, z̈, θ̈] to later put in ODE solver solve_ivp
+    z_wf_dot_dot  = (F_s_f + F_t_f) / m_wf
+    z_wr_dot_dot  = (F_s_r + F_t_r) / m_wr
+
+    return np.array([
+        z_dot,          # d/dt z
+        theta_dot,      # d/dt theta
+        z_wf_dot,       # d/dt z_wf
+        z_wr_dot,       # d/dt z_wr
+        z_dot_dot,         # d/dt z_dot
+        theta_dot_dot,     # d/dt theta_dot
+        z_wf_dot_dot,      # d/dt z_wf_dot
+        z_wr_dot_dot       # d/dt z_wr_dot
+    ])
 
 
 # Key Modelling assumptions for now:
@@ -106,8 +128,8 @@ def run_simulation(p: CarParams, base: BaseInput, opts: SimulationOptions):
     # rtol / atol are local error control. Roughly, solver tries to keep the local truncation error below atol + rtol * abs(y)
     # dense_output = True builds a continuous time interval
     sol = solve_ivp(fun, opts.t_span, opts.y_0,
-                    rtol=opts.r_tolerance, atol=opts.a_tolerance,
-                    dense_output=opts.dense)
+                    rtol = opts.r_tolerance, atol = opts.a_tolerance,
+                    dense_output = opts.dense)
     return sol
 
 # This function was done by GPT
@@ -120,22 +142,54 @@ def undamped_naturals(p: CarParams):
     return np.sort(wn / (2*np.pi))         # Hz
 
 # Spacing out uniformly the time and evaluates the dense interpolant sol.sol
-def sample_states(sol, t_span, n = 2000):
-    """Uniformly sample the dense solution (requires dense_output=True)."""
+def sample_states(sol, t_span, n=2000):
     t = np.linspace(t_span[0], t_span[1], n)
-    z, theta, z_dot, theta_dot = sol.sol(t)
-    
-    # Returns state components as arrays of length n
-    return t, z, theta, z_dot, theta_dot
+    z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sol.sol(t)
+    return t, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot
 
 # In this function we are computing the accelerations using the values from the RHS.
-def accelerations_from_rhs(t, z, theta, z_dot, theta_dot, p, base):
-    """Compute [z̈, θ̈] by calling the RHS (noise-free vs numerical differentiation)."""
-    z_dot_dot, theta_dot_dot = [], []
-    for ti, zi, thetai, z_doti, theta_doti in zip(t, z, theta, z_dot, theta_dot):
-        _, _, z_dot_doti, theta_dot_doti = rhs_car(ti, [zi, thetai, z_doti, theta_doti], p, base)
-        z_dot_dot.append(z_dot_doti); theta_dot_dot.append(theta_dot_doti)
-    return np.asarray(z_dot_dot), np.asarray(theta_dot_dot)
+def accelerations_from_rhs(t_arr,
+                            z_arr, theta_arr, z_wf_arr, z_wr_arr,
+                            z_dot_arr, theta_dot_arr, z_wf_dot_arr, z_wr_dot_arr,
+                            p, base):
+    """
+    Compute accelerations [z̈, θ̈, z̈_wf, z̈_wr] for the 4-DOF half-car model.
+
+    Inputs are the time histories of positions and velocities for body and wheels.
+    """
+
+    z_dot_dot = []
+    theta_dot_dot = []
+    zwf_dot_dot = []
+    zwr_dot_dot = []
+
+    for ti, zi, thi, zwfi, zwri, zdi, thdi, zwfdi, zwrdi in zip(
+            t_arr,
+            z_arr, theta_arr, z_wf_arr, z_wr_arr,
+            z_dot_arr, theta_dot_arr, z_wf_dot_arr, z_wr_dot_arr
+        ):
+        x_state = np.array([
+            zi, thi, zwfi, zwri,
+            zdi, thdi, zwfdi, zwrdi
+        ], dtype=float)
+
+        xdot = rhs_car(ti, x_state, p, base)
+        # xdot indices:
+        # 4 -> z̈
+        # 5 -> θ̈
+        # 6 -> z̈_wf
+        # 7 -> z̈_wr
+
+        z_dot_dot.append(xdot[4])
+        theta_dot_dot.append(xdot[5])
+        zwf_dot_dot.append(xdot[6])
+        zwr_dot_dot.append(xdot[7])
+
+    return (np.array(z_dot_dot),
+            np.array(theta_dot_dot),
+            np.array(zwf_dot_dot),
+            np.array(zwr_dot_dot))
+
 
 # Computing accelerations using the sol.sol function
 def accelerations_from_sol(sol, p: CarParams, base: BaseInput, t_grid):
@@ -161,19 +215,42 @@ def rms(a):
 #Parameters
 # Nominal average car values
 p = CarParams(
-    body_M = 1200.0, body_inertia = 2200.0,
-    body_a = 1.2, body_b = 1.3,
-    FWS_k = 35e3, FWD_c = 3.0e3,
-    RWS_k = 30e3, RWD_c = 3.0e3,
-    FWP_theta = 0.0, FWP_z = 0.0,
-    RWP_theta = 0.0, RWP_z = 0.0
+    body_M = 1200.0,          # Sprung mass (kg)
+    body_inertia = 2200.0,    # Pitch inertia (kg·m²)
+    body_a = 1.2,             # CG to front axle (m)
+    body_b = 1.3,             # CG to rear axle (m)
+
+    FWS_k = 35e3,             # Front suspension spring (N/m)
+    FWD_c = 3.0e3,            # Front damper (N·s/m)
+    RWS_k = 30e3,             # Rear suspension spring (N/m)
+    RWD_c = 3.0e3,            # Rear damper (N·s/m)
+
+    m_wf = 40.0,              # Front unsprung mass (kg)
+    m_wr = 35.0,              # Rear unsprung mass (kg)
+    k_tf = 2.0e5,             # Front tyre stiffness (N/m)
+    k_tr = 1.8e5,             # Rear tyre stiffness (N/m)
+
+    FWP_theta = 0.0,
+    FWP_z = 0.0,
+    RWP_theta = 0.0,
+    RWP_z = 0.0
 )
+
 
 # Simulation options
 # 5 second test, release the car from a 2cm free fall (wheels are touching the ground, spring is just stretched)
 opts = SimulationOptions(
-    t_span = (0.0, 5.0),             # 5 s
-    y_0 = [0.02, 0.0, 0.0, 0.0]      # 2 cm heave release, zero pitch & rates
+    t_span = (0.0, 5.0),      # 5 s
+    y_0 = [
+    0.02,        # z
+    0.0,         # theta
+    0.0,         # z_wf
+    0.0,         # z_wr
+    0.0,         # z_dot
+    0.0,         # theta_dot
+    0.0,         # z_wf_dot
+    0.0          # z_wr_dot
+]
 )
 
 # Run
@@ -182,11 +259,17 @@ sol = run_simulation(p, zero_base, opts)
 
 # Sample states uniformly
 # ts is the continuous times, whereas the rest of the values are sampled from the sol.sol(ts) function which are the model's solutions from our equations
-ts, z, theta, z_dot, theta_dot = sample_states(sol, opts.t_span, n = 2000)
+ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 2000)
 
 # Accelerations (via RHS)
 # Finding the accelerations via our formula (the physics)
-z_dot_dot, theta_dot_dot = accelerations_from_rhs(ts, z, theta, z_dot, theta_dot, p, zero_base)
+z_dot_dot, theta_dot_dot, z_wf_dot_dot, z_wr_dot_dot = accelerations_from_rhs(
+    ts,
+    z, theta, z_wf, z_wr,
+    z_dot, theta_dot, z_wf_dot, z_wr_dot,
+    p,
+    zero_base
+)
 
 # Occupant acceleration at a chosen x from CG
 seat_x = 0.8
@@ -223,5 +306,16 @@ plt.xlabel("Time [s]")
 plt.ylabel("Vertical acceleration [m/s²]")
 plt.title(f"Passenger Vertical Accel (x={seat_x} m from CG)")
 plt.grid(True)
+
+# (D) Wheel accel
+plt.figure()
+plt.plot(ts, z_wf_dot_dot, label = 'Front Wheel')
+plt.plot(ts, z_wr_dot_dot, label = 'Rear Wheel')
+plt.xlabel("Time [s]")
+plt.ylabel("Wheel acceleration [m/s²]")
+plt.title("Unsprung (wheel) accelerations")
+plt.grid(True)
+plt.legend()
+
 
 plt.show()
