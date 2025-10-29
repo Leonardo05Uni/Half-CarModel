@@ -1,17 +1,11 @@
 # -*- coding: utf-8 -*-
 
-# ----------------------------
-# Imports
-# ----------------------------
 from dataclasses import dataclass
 from typing import Callable, Tuple
 import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
 
-# ----------------------------
-# Data containers
-# ----------------------------
 @dataclass
 class CarParams:
     """All physical parameters of the 2-DOF car body model."""
@@ -39,9 +33,6 @@ class SimulationOptions:
     dense: bool = True  # return continuous (dense) solution
 
 
-# ----------------------------
-# Types & base (road) input
-# ----------------------------
 # Road input signature:
 #  returns (y_f, y_r, y_f_dot, y_r_dot) at time t
 BaseInput = Callable[[float], Tuple[float, float, float, float]]
@@ -50,9 +41,6 @@ def zero_base(_: float) -> Tuple[float, float, float, float]:
     """Flat road: zero displacement/velocity at both wheels."""
     return 0.0, 0.0, 0.0, 0.0 # (y_f, y_r, y_f_dot, y_r_dot)
 
-# ----------------------------
-# System matrices (for modal checks)
-# ----------------------------
 def build_matrices_mck(p: CarParams):
     """
     Assemble mass (M), damping (C), stiffness (K) matrices for the 2-DOF body.
@@ -74,10 +62,6 @@ def build_matrices_mck(p: CarParams):
 
     return M, C, K
 
-
-# ----------------------------
-# Dynamics (RHS)
-# ----------------------------
 # This function is defining the right hand side of our ODE x_dot = f(t,x)
 # We are computing [ż, θ, z̈, θ̈] to feed into our ODE
 def rhs_car(t, x, p: CarParams, base: BaseInput):
@@ -114,9 +98,6 @@ def rhs_car(t, x, p: CarParams, base: BaseInput):
 # Linear springs/dampers, connected directly to the body (no wheel unsprung mass yet)
 # Linearisation about static equilibrium (gravity cancelled by static spring pre-load)
 
-# ----------------------------
-# Integrator wrapper
-# ----------------------------
 def run_simulation(p: CarParams, base: BaseInput, opts: SimulationOptions):
     """Integrate the ODE using solve_ivp and return the solution object."""
     def fun(t, x):
@@ -128,11 +109,6 @@ def run_simulation(p: CarParams, base: BaseInput, opts: SimulationOptions):
                     rtol=opts.r_tolerance, atol=opts.a_tolerance,
                     dense_output=opts.dense)
     return sol
-
-
-# ----------------------------
-# Analysis helpers
-# ----------------------------
 
 # This function was done by GPT
 # This is getting the Eigenvalues of K*phi = lambda*M*phi and converting in Hz to find the resonant frequency of the system as a sanity check
@@ -182,10 +158,6 @@ def rms(a):
     """Root-mean-square of a signal."""
     return float(np.sqrt(np.mean(a**2)))
 
-
-# ----------------------------
-# Script entry point (example use)
-# ----------------------------
 #Parameters
 # Nominal average car values
 p = CarParams(
