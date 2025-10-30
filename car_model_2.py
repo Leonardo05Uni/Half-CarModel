@@ -5,6 +5,8 @@ from typing import Callable, Tuple
 import numpy as np
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
+import pandas as pd
+from scipy.interpolate import UnivariateSpline
 
 @dataclass
 class CarParams:
@@ -41,9 +43,21 @@ class SimulationOptions:
 #  returns (y_f, y_r, y_f_dot, y_r_dot) at time t
 BaseInput = Callable[[float], Tuple[float, float, float, float]]
 
-def zero_base(_: float) -> Tuple[float, float, float, float]:
-    """Flat road: zero displacement/velocity at both wheels."""
-    return 0.0, 0.0, 0.0, 0.0 # (y_f, y_r, y_f_dot, y_r_dot)
+## ======== Start of CSV Loading and interpretation==============
+# loading the CSV file and defining the columns
+df = pd.read_csv("bumpy_road_cords.csv")
+x = df['distance'].values
+y = df['height'].values
+# defining the spline action with smoothing factor
+spline = UnivariateSpline(x, y, s=0.3)  # adjust s as needed, high s is smoother but less true
+#y_smooth is the set of smoothed y values
+y_smooth = spline(x)
+def zero_base(_: x_r) -> Tuple[float, float, float, float]:
+    x_f = x_r + 2.5
+    y_r, y_f, y_r_dot, y_f_dot = spline(x_f) , spline( x_r), spline.derivative()(x_r), spline.derivative()(x_f)
+    return y_r, y_f, y_r_dot, y_f_dot # (y_f, y_r, y_f_dot, y_r_dot)
+
+## ========= End of CSV Loading and Interpretation===========
 
 def build_matrices_mck(p: CarParams):
     """
@@ -319,3 +333,4 @@ plt.legend()
 
 
 plt.show()
+
