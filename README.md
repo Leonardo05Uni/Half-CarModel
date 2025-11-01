@@ -46,6 +46,7 @@ Component / Positions Names (number reference those found in figure 1 on 'Model 
 11 - F - Force
 
 Project File Overview
+
 **car_model_2.py**
   – Core 2-DOF body dynamics model.  
   - Defines mass, damping, and stiffness matrices  
