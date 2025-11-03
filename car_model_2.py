@@ -49,7 +49,7 @@ df = pd.read_csv("bumpy_road_cords.csv")
 x = df['distance'].values
 y = df['height'].values
 # defining the spline action with smoothing factor
-spline = UnivariateSpline(x, y, s=0.3)  # adjust s as needed, high s is smoother but less true
+spline = UnivariateSpline(x, y, s=0.4)  # adjust s as needed, high s is smoother but less true
 #y_smooth is the set of smoothed y values
 y_smooth = spline(x)
 def zero_base(_: x_r) -> Tuple[float, float, float, float]:
@@ -333,4 +333,5 @@ plt.legend()
 
 
 plt.show()
+
 
