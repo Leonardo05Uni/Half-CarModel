@@ -38,11 +38,6 @@ class SimulationOptions:
     a_tolerance: float = 1e-9
     dense: bool = True  # return continuous (dense) solution
 
-
-# Road input signature:
-#  returns (y_f, y_r, y_f_dot, y_r_dot) at time t
-BaseInput = Callable[[float], Tuple[float, float, float, float]]
-
 ## ======== Start of CSV Loading and interpretation==============
 # loading the CSV file and defining the columns
 df = pd.read_csv("bumpy_road_cords.csv")
@@ -51,12 +46,47 @@ y = df['height'].values
 # defining the spline action with smoothing factor
 spline = UnivariateSpline(x, y, s = 0.4)  # adjust s as needed, high s is smoother but less true
 #y_smooth is the set of smoothed y values
-y_smooth = spline(x)
-def zero_base(_: float) -> Tuple[float, float, float, float]:
-    x_r = 39.6
-    x_f = 39.6 + 2.5
-    y_r, y_f, y_r_dot, y_f_dot = spline(x_r) , spline(x_f), spline.derivative()(x_r), spline.derivative()(x_f)
-    return y_f, y_r, y_f_dot, y_r_dot # (y_f, y_r, y_f_dot, y_r_dot)
+dsdx = spline.derivative()
+
+# Road input signature:
+#  returns (y_f, y_r, y_f_dot, y_r_dot) at time t
+
+BaseInput = Callable[[float], Tuple[float, float, float, float]]
+
+def make_road_base(p, spline, dsdx, v = 8.0, x0 = 0.0, clamp = True):
+    """
+    v  : vehicle speed [m/s]
+    x0 : CG position at t=0 along the profile [m]
+    clamp: clip queries to [xmin,xmax] to avoid NaNs outside the profile
+    """
+    xmin, xmax = float(np.min(x)), float(np.max(x))
+
+    def base(t: float):
+        # CG position over time
+        x_cg = x0 + v * t
+
+        # Front & rear contact patch positions using your geometry
+        # (front ahead by a, rear behind by b)
+        x_f = x_cg + p.body_a
+        x_r = x_cg - p.body_b
+
+        if clamp:
+            x_fq = np.clip(x_f, xmin, xmax)
+            x_rq = np.clip(x_r, xmin, xmax)
+        else:
+            x_fq, x_rq = x_f, x_r  # may extrapolate poorly
+
+        # Heights
+        y_f = float(spline(x_fq))
+        y_r = float(spline(x_rq))
+
+        # Chain rule: dy/dt = (dy/dx) * dx/dt = (dy/dx) * v
+        y_f_dot = float(dsdx(x_fq)) * v
+        y_r_dot = float(dsdx(x_rq)) * v
+
+        return y_f, y_r, y_f_dot, y_r_dot
+
+    return base
 
 ## ========= End of CSV Loading and Interpretation===========
 
@@ -236,9 +266,9 @@ p = CarParams(
     body_b = 1.3,             # CG to rear axle (m)
 
     FWS_k = 35e3,             # Front suspension spring (N/m)
-    FWD_c = 3.0e3,            # Front damper (N·s/m)
+    FWD_c = 500,             # Front damper (N·s/m)
     RWS_k = 30e3,             # Rear suspension spring (N/m)
-    RWD_c = 3.0e3,            # Rear damper (N·s/m)
+    RWD_c = 500,            # Rear damper (N·s/m)
 
     m_wf = 40.0,              # Front unsprung mass (kg)
     m_wr = 35.0,              # Rear unsprung mass (kg)
@@ -251,26 +281,24 @@ p = CarParams(
     RWP_z = 0.0
 )
 
-
-# Simulation options
-# 5 second test, release the car from a 2cm free fall (wheels are touching the ground, spring is just stretched)
-opts = SimulationOptions(
-    t_span = (0.0, 5.0),      # 5 s
-    y_0 = [
-    0.02,        # z
-    0.0,         # theta
-    0.0,         # z_wf
-    0.0,         # z_wr
-    0.0,         # z_dot
-    0.0,         # theta_dot
-    0.0,         # z_wf_dot
-    0.0          # z_wr_dot
-]
-)
-
 # Run
 # Integrates system with flat road
-sol = run_simulation(p, zero_base, opts)
+road_base = make_road_base(p, spline, dsdx, v = 8.0, x0 = 0.0)
+
+# Simulation options
+y_f0, y_r0, _, _ = road_base(0.0)
+opts = SimulationOptions(
+    t_span=(0.0, 20),
+    y_0=[
+        0.0,      # z
+        0.0,      # theta
+        y_f0,     # z_wf   (wheel sits on road at t=0)
+        y_r0,     # z_wr
+        0.0, 0.0, 0.0, 0.0
+    ]
+)
+
+sol = run_simulation(p, road_base, opts)
 
 # Sample states uniformly
 # ts is the continuous times, whereas the rest of the values are sampled from the sol.sol(ts) function which are the model's solutions from our equations
@@ -283,7 +311,7 @@ z_dot_dot, theta_dot_dot, z_wf_dot_dot, z_wr_dot_dot = accelerations_from_rhs(
     z, theta, z_wf, z_wr,
     z_dot, theta_dot, z_wf_dot, z_wr_dot,
     p,
-    zero_base
+    road_base
 )
 
 # Occupant acceleration at a chosen x from CG
