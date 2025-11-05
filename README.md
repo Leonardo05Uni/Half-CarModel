@@ -1,51 +1,35 @@
 # CMM-Group9
-computer modeling and design group 9 project
-This project models a 2-DOF vehicle body system responding to road surface inputs such as bumps and potholes.  
-It simulates the heave (vertical) and pitch (rotational) motion of the vehicle using linear spring–damper dynamics,  
-with equations of motion integrated numerically in Python.
 
-Legend: 
-Suffix meaning:
-_P - Position vector
-_V - Velocity vector
-_M - Mass
-_theta - orientation / Angle
-_phi - Damping coefficient
-_k - stiffness coefficient
-_L - Length
-_a - length to front wheel from CG
-_b - length to back wheel from CG
-_dL - Change in length
-_inertia - Inertia of sprung mass
-_z - height (z value of car movement)
-_dot - differentiated
-_f - front of car
-_r - rear of car
-_dot_dot – second derivative (acceleration)  
-_c – damping coefficient 
-_base – baseline input (e.g., zero_base flat road)  
-_series – time-dependent data series (e.g., speed_bump_series)  
-_theta_dot – angular velocity (pitch rate)  
-_theta_dot_dot – angular acceleration (pitch angular rate)  
-_z_dot – vertical velocity  
-_z_dot_dot – vertical acceleration  
-_pass – passenger-related variable  
-_x – longitudinal position along car body
+### Overview
 
-Component / Positions Names (number reference those found in figure 1 on 'Model drawing - car v2.png')
-1 - RWS - rear wheel spring
-2 - RWD - rear wheel damper
-3 - RWC - rear wheel centre
-4 - RWP - rear wheel connection (point)
-5 - FWS - Front wheel spring
-6 - FWD - Front Wheel Damper
-7 - FWC - Front wheel centre
-8 - FWP - Front wheel connection (point)
-9 - DP - Drivers position
-10 - body - Sprung mass
-11 - F - Force
+The performance and comfort of a vehicle are strongly influenced by its suspension system, which governs how the car responds to uneven road surfaces, so
+this project aims to simulate a car traveling over a bumpy road to investigate how different suspension parameters affect ride comfort and stability.  
 
-Project File Overview
+The simulation provides a simplified but informative representation of vehicle dynamics which is focusing on vertical (heave) and rotational (pitch) motion caused by road irregularities.  
+
+Through this, our project aims to:
+- Understand the dynamic interaction between road surface, suspension, and vehicle body.  
+- Quantify how spring stiffness and damping coefficients influence vertical and angular acceleration.  
+- Identify parameter combinations that minimize the Root Mean Square acceleration.
+
+### System Component / Positions Names
+(number reference those found in figure 1 on 'Model drawing - car v2.png')
+
+The vehicle is represented as a 2-DOF rigid body model supported by front and rear spring–damper systems.  
+Each wheel follows the input road profile independently, transmitting forces to the car body, which moves vertically and rotates about its center of gravity (CG).
+
+| ID | Symbol | Description |
+|----|---------|-------------|
+| 1,5 | RWS / FWS | Rear / Front Wheel Spring |
+| 2,6 | RWD / FWD | Rear / Front Wheel Damper |
+| 3,7 | RWC / FWC | Rear / Front Wheel Centre |
+| 4,8 | RWP / FWP | Rear / Front Wheel Connection (link) |
+| 9 | Body | Vehicle Sprung Mass (rigid body) |
+
+The **car body** is modeled as a rigid bar of mass \( M \) and rotational inertia \( I \).  
+Front and rear suspensions act as spring–damper pairs located at distances \( a \) and \( b \) from the CG.
+
+### Project File Overview
 
 **car_model_2.py**
   – Core 2-DOF body dynamics model.  
@@ -69,7 +53,39 @@ Project File Overview
 
 **Model drawing – car v2.png**
   – Schematic of the 2-DOF suspension layout  
-  - Annotates front/rear wheel positions and reference points  
+  - Annotates front/rear wheel positions and reference points
+
+
+### Suffix Meaning
+
+| Suffix        | Meaning |
+|---------------|---------|
+| `_P`          | Position vector |
+| `_V`          | Velocity vector |
+| `_M`          | Mass |
+| `_theta`      | Orientation / Angle |
+| `_phi`        | Damping coefficient |
+| `_k`          | Stiffness coefficient |
+| `_L`          | Length |
+| `_a`          | Length to front wheel from CG |
+| `_b`          | Length to back wheel from CG |
+| `_dL`         | Change in length |
+| `_inertia`    | Inertia of sprung mass |
+| `_z`          | Height (z value of car movement) |
+| `_dot`        | Differentiated (time derivative) |
+| `_dot_dot`    | Second derivative (acceleration) |
+| `_f`          | Front of car |
+| `_r`          | Rear of car |
+| `_c`          | Damping coefficient |
+| `_base`       | Baseline input (e.g., `zero_base` flat road) |
+| `_series`     | Time-dependent data series (e.g., `speed_bump_series`) |
+| `_theta_dot`  | Angular velocity (pitch rate) |
+| `_theta_dot_dot` | Angular acceleration (pitch angular rate) |
+| `_z_dot`      | Vertical velocity |
+| `_z_dot_dot`  | Vertical acceleration |
+| `_pass`       | Passenger-related variable |
+| `_x`          | Longitudinal position along car body |
+
 
 
 
