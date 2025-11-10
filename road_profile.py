@@ -6,7 +6,7 @@ import pandas as pd
 def generate_bumpy_road(length=100, resolution=0.01, incline=0,
                         bump_height=0.1, bump_width=1.2,
                         pothole_depth=0.1, pothole_width=2,
-                        num_bumps=2, num_potholes=4, imperfection=0.01):
+                        num_bumps=2, num_potholes=2, imperfection=0.01):
     """
 
     Parameters:
@@ -81,22 +81,22 @@ def generate_bumpy_road(length=100, resolution=0.01, incline=0,
     bumpy_y = np.copy(y)
 
     # Define a mask for flat regions (regions not affected by bumps or potholes)
-    flat_mask = np.ones_like(y, dtype=bool)
+    flat_region = np.ones_like(y, dtype=bool)
 
     # Mask out bumps
     for pos in bump_positions:
         left_edge = pos - bump_width / 2
         right_edge = pos + bump_width / 2
-        flat_mask[(x >= left_edge) & (x <= right_edge)] = False
+        flat_region[(x >= left_edge) & (x <= right_edge)] = False
 
     # Mask out potholes
     for pos in pothole_positions:
         left_edge = pos - pothole_width / 2
         right_edge = pos + pothole_width / 2
-        flat_mask[(x >= left_edge) & (x <= right_edge)] = False
+        flat_region[(x >= left_edge) & (x <= right_edge)] = False
 
     # Apply imperfections only to flat areas
-    bumpy_y[flat_mask] += np.random.uniform(-imperfection, imperfection, size=np.sum(flat_mask))
+    bumpy_y[flat_region] += np.random.uniform(-imperfection, imperfection, size=np.sum(flat_region))
 
     # Create DataFrame with proper structure
     df = pd.DataFrame({'distance': x, 'height': bumpy_y})
