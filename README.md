@@ -9,7 +9,8 @@ This project simulates a car travelling over a rough road to investigate how var
 The simulation provides a physically meaningful representation of vehicle dynamics, which is focused on rideing comfort and vibration controlling through suspension tuning.  
 
 **The reallife example:**  
-Car: 2018 Ford Fiesta 5dr, 1.0L. (https://media.ford.com/content/dam/fordmedia/Europe/documents/productReleases/Fiesta/FordFiesta2017_FiestaDrive_TechSpecs_EU.pdf)  
+Car: 2018 Ford Fiesta ST Line 5dr, 1.0L.  
+(https://media.ford.com/content/dam/fordmedia/Europe/documents/productReleases/Fiesta/FordFiesta2017_FiestaDrive_TechSpecs_EU.pdf)  
 
 
 ### Project Objectives  
