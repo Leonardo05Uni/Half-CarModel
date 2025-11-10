@@ -616,20 +616,20 @@ def damping_monte_carlo_error(p: CarParams,
 
 # Nominal car parameters (order-of-magnitude realistic values)
 p = CarParams(
-    body_M=1200.0,          # Sprung mass [kg]
-    body_inertia=2200.0,    # Pitch inertia [kg·m²]
-    body_a=1.2,             # CG to front axle [m]
-    body_b=1.3,             # CG to rear axle [m]
+    body_M=1163-(29*4),          # Sprung mass [kg]
+    body_inertia=3000.0,    # Pitch inertia [kg·m²]
+    body_a=0.996,             # CG to front axle [m]
+    body_b=1.494,             # CG to rear axle [m]
 
-    FWS_k=35e3,             # Front suspension spring [N/m]
+    FWS_k=30100,             # Front suspension spring [N/m]
     FWD_c=500.0,            # Front damper [N·s/m]
-    RWS_k=30e3,             # Rear suspension spring [N/m]
+    RWS_k=32000,             # Rear suspension spring [N/m]
     RWD_c=500.0,            # Rear damper [N·s/m]
 
-    m_wf=40.0,              # Front unsprung mass [kg]
-    m_wr=35.0,              # Rear unsprung mass [kg]
-    k_tf=2.0e5,             # Front tyre stiffness [N/m]
-    k_tr=1.8e5,             # Rear tyre stiffness [N/m]
+    m_wf=58,              # Front unsprung mass [kg]
+    m_wr=58,              # Rear unsprung mass [kg]
+    k_tf=200000,             # Front tyre stiffness [N/m]
+    k_tr=200000,             # Rear tyre stiffness [N/m]
 
     FWP_theta=0.0,
     FWP_z=0.0,
@@ -685,6 +685,7 @@ c_opt, se_c = damping_monte_carlo_error(p, road_base, opts_opt, seat_x,
                                         n_samples=8, rel_variation=0.05)
 
 print(f"\nOptimal (equal) damping FWD_c = RWD_c ≈ {c_opt:.2f} N·s/m")
+print("Damping ratio:", (c_opt/p.body_M)/(2*undamped_naturals(p)*2*np.pi))
 print(f"Monte Carlo standard error on c_opt ≈ {se_c:.2f} N·s/m")
 print(f"95% CI for c_opt ≈ {c_opt:.2f} ± {1.96 * se_c:.2f} N·s/m\n")
 

@@ -18,33 +18,33 @@ from scipy.interpolate import UnivariateSpline
 @dataclass
 class CarParams:
     # Car Body
-    body_M: float          # Mass (kg)
-    body_inertia: float    # Inertia about CG (kgm^2)
-    body_a: float          # Distance CG to front suspension (m)
-    body_b: float          # Distance CG to back suspension (m)
+    body_M: float # Mass (kg)
+    body_inertia: float # Inertia about CG (kgm^2)
+    body_a: float # Distance CG to front suspension (m)
+    body_b: float # Distance CG to back suspension (m)
 
     # Body Suspension
-    FWS_k: float           # Front spring (N/m)
-    FWD_c: float           # Front damper (Ns/m)
-    RWS_k: float           # Rear spring (N/m)
-    RWD_c: float           # Rear damper (Ns/m)
+    FWS_k: float # Front spring (N/m)
+    FWD_c: float # Front damper (Ns/m)
+    RWS_k: float # Rear spring (N/m)
+    RWD_c: float # Rear damper (Ns/m)
 
     # Wheel Masses
-    m_wf: float            # Front wheel mass (kg)
-    m_wr: float            # Rear wheel mass (kg)
+    m_wf: float # Front wheel mass (kg)
+    m_wr: float # Rear wheel mass (kg)
 
     # Tyre stiffness
-    k_tf: float            # Front tyre (N/m)
-    k_tr: float            # Rear tyre (N/m)
+    k_tf: float # Front tyre (N/m)
+    k_tr: float # Rear tyre (N/m)
 
 
 @dataclass
 class SimulationOptions:
-    t_span: tuple          # t0 to t_end (s) start to end of simulation (length of road in our case)
-    y_0: list              # Initial state, just the position of car at beginning - will be 0
+    t_span: tuple # t0 to t_end (s) start to end of simulation (length of road in our case)
+    y_0: list # Initial state, just the position of car at beginning - will be 0
     r_tolerance: float = 1e-7 # Tolerances required for solving later
     a_tolerance: float = 1e-9
-    dense: bool = True     # Dense solution again required for solving later
+    dense: bool = True # Dense solution again required for solving later
 
 
 # THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "IMPORTING THE ROAD PROFILE" SHEET OF NOTES
@@ -60,7 +60,7 @@ y = df["height"].values # Road height labelled as y
 
 # Smooth road profile y(x) using UnivariateSpline import 
 spline = UnivariateSpline(x, y, s = 0.4) # s = 0.4 is used to define how smooth you want the curve to be, higher value more smooth
-dsdx = spline.derivative()   # dy/dx for road inputs later
+dsdx = spline.derivative() # dy/dx for road inputs later
 
 # make_road_base function outputs the base(t) function which returns (yf, yr, yfdot, yrdot) as per the next bits of code
 def make_road_base(p: CarParams,
@@ -106,7 +106,7 @@ def make_road_base(p: CarParams,
 
 # These matrices are built around the original simplied 2-DOF model to later check for resonant frequencies as a sanity check
 def build_matrices_mck(p: CarParams):
-    
+
     # Necessary variables to build matrices imported from the CarParams class
     m, I = p.body_M, p.body_inertia
     a, b = p.body_a, p.body_b
@@ -131,7 +131,7 @@ def build_matrices_mck(p: CarParams):
 def undamped_naturals(p: CarParams):
     M, _, K = build_matrices_mck(p)
     lam, _ = np.linalg.eig(np.linalg.solve(M, K))  # Eigenvalues of M^(-1)K
-    wn = np.sqrt(np.clip(lam, 0.0, None))          # Finding frequency (rad/s)
-    return np.sort(wn / (2 * np.pi))               # Rad/s to Hz
+    wn = np.sqrt(np.clip(lam, 0.0, None)) # Finding frequency (rad/s)
+    return np.sort(wn / (2 * np.pi)) # Rad/s to Hz
 
 
