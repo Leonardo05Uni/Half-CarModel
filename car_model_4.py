@@ -405,45 +405,41 @@ def rms(a):
 
 def bisection(f, a, b, N):
     """
-    Classic bisection method as taught in Lectures 4 & 4B.
+    Simple bisection method (root finding) as in the lectures.
 
     Solves f(x) = 0 on [a, b] assuming f(a)*f(b) < 0.
+    N is the fixed number of iterations.
     """
-    if f(a) * f(b) >= 0:
-        raise ValueError("Bisection method requires f(a)*f(b) < 0 on [a,b].")
+    fa = f(a)
+    fb = f(b)
+    if fa * fb >= 0:
+        raise ValueError("Bisection requires f(a)*f(b) < 0 on [a,b].")
 
-    a_n = a
-    b_n = b
-    for n in range(1, N + 1):
+    a_n, b_n = a, b
+    for _ in range(N):
         m_n = 0.5 * (a_n + b_n)
-        f_m_n = f(m_n)
-
-        if f(a_n) * f_m_n < 0:
+        f_m = f(m_n)
+        if fa * f_m < 0:
             b_n = m_n
-        elif f(b_n) * f_m_n < 0:
-            a_n = m_n
+            fb = f_m
         else:
-            # Found exact (or very close) root
-            return m_n
-
+            a_n = m_n
+            fa = f_m
     return 0.5 * (a_n + b_n)
 
 
 def passenger_rms_for_damping(c_damp: float,
                               p: CarParams,
                               base: BaseInput,
-                              opts: SimulationOptions,
+                              opts_local: SimulationOptions,
                               seat_x: float) -> float:
     """
-    For a given (scalar) damping coefficient c_damp, set
+    For a given damping c_damp, set FWD_c = RWD_c = c_damp,
+    run a LIGHT simulation, and return passenger RMS vertical acceleration.
 
-        FWD_c = RWD_c = c_damp
-
-    run the simulation and return the passenger RMS vertical acceleration.
-
-    This is our objective function J(c) we want to MINIMISE.
+    This is our objective J(c) to be minimised.
     """
-    # Build a copy of p with updated damping (keep all other parameters identical)
+    # Copy parameters with updated damping
     p_loc = CarParams(
         body_M=p.body_M,
         body_inertia=p.body_inertia,
@@ -463,9 +459,11 @@ def passenger_rms_for_damping(c_damp: float,
         k_tr=p.k_tr
     )
 
-    sol_loc = run_simulation(p_loc, base, opts)
+    sol_loc = run_simulation(p_loc, base, opts_local)
+
+    # fewer points for optimisation
     ts_loc, z_loc, theta_loc, z_wf_loc, z_wr_loc, z_dot_loc, theta_dot_loc, z_wf_dot_loc, z_wr_dot_loc = \
-        sample_states(sol_loc, opts.t_span, n=1000)
+        sample_states(sol_loc, opts_local.t_span, n=300)
 
     z_ddot_loc, theta_ddot_loc, _, _ = accelerations_from_rhs(
         ts_loc,
@@ -482,124 +480,107 @@ def passenger_rms_for_damping(c_damp: float,
 def dJ_dc(c_damp: float,
           p: CarParams,
           base: BaseInput,
-          opts: SimulationOptions,
+          opts_local: SimulationOptions,
           seat_x: float) -> float:
     """
-    Numerical derivative of the objective J(c) w.r.t. damping c using a
-    central finite difference:
+    Numerical derivative of J(c) = RMS_passenger(c):
 
-        dJ/dc ≈ [ J(c+h) - J(c-h) ] / (2h)
+        dJ/dc ≈ [J(c+h) - J(c-h)] / (2h)
 
-    The ROOT of this function (dJ/dc = 0) corresponds to an extremum of J,
-    which in our case should be a minimum of passenger RMS accel.
+    Using a relative step size h = 0.1*c.
     """
-    # Relative step size (avoid h too small or zero)
     h = 0.1 * c_damp if c_damp > 0 else 1.0
 
-    J_plus = passenger_rms_for_damping(c_damp + h, p, base, opts, seat_x)
-    J_minus = passenger_rms_for_damping(c_damp - h, p, base, opts, seat_x)
+    J_plus = passenger_rms_for_damping(c_damp + h, p, base, opts_local, seat_x)
+    J_minus = passenger_rms_for_damping(c_damp - h, p, base, opts_local, seat_x)
 
     return (J_plus - J_minus) / (2.0 * h)
 
 
 def find_bracket_for_derivative(p: CarParams,
                                 base: BaseInput,
-                                opts: SimulationOptions,
+                                opts_local: SimulationOptions,
                                 seat_x: float,
                                 c_min: float,
                                 c_max: float,
-                                n_scan: int = 15):
+                                n_scan: int = 7):
     """
-    Scan the damping range [c_min, c_max] and look for a sign change in dJ/dc.
-    Returns (a,b) such that dJ/dc(a) * dJ/dc(b) < 0, or None if none found.
+    Scan dJ/dc on [c_min, c_max] with n_scan points and return a bracket [a,b]
+    where dJ/dc changes sign, or None if not found.
     """
     cs = np.linspace(c_min, c_max, n_scan)
-    f_vals = [dJ_dc(c_val, p, base, opts, seat_x) for c_val in cs]
+    f_vals = [dJ_dc(c_val, p, base, opts_local, seat_x) for c_val in cs]
 
     for i in range(len(cs) - 1):
         if f_vals[i] * f_vals[i + 1] < 0:
             return cs[i], cs[i + 1]
-
     return None
 
 
 def optimise_damping(p: CarParams,
                      base: BaseInput,
-                     opts: SimulationOptions,
+                     opts_local: SimulationOptions,
                      seat_x: float,
                      c_min: float = 100.0,
-                     c_max: float = 3000.0):
+                     c_max: float = 3000.0) -> float:
     """
-    One-dimensional optimisation of damping coefficients using ROOT-FINDING.
+    Find optimal damping c_opt such that FWD_c = RWD_c = c_opt
+    by solving dJ/dc = 0 with bisection.
 
-    We assume (for now) that the optimal front and rear damping coefficients
-    are equal:
-
-        FWD_c = RWD_c = c_opt
-
-    We define the objective J(c) as the RMS passenger vertical acceleration and
-    solve dJ/dc = 0 using the bisection method on a bracket [c_min, c_max].
-
-    If no clean sign change in dJ/dc is found, we fall back to a simple grid
-    search over J(c) in that interval and choose the minimum.
+    If no sign change is found, fall back to a simple coarse grid search.
     """
-    # Try to bracket a root of dJ/dc
-    bracket = find_bracket_for_derivative(p, base, opts, seat_x, c_min, c_max)
+    bracket = find_bracket_for_derivative(p, base, opts_local, seat_x, c_min, c_max)
 
     if bracket is None:
-        # No sign change in dJ/dc; fall back to coarse search on J(c)
-        cs = np.linspace(c_min, c_max, 20)
-        Js = [passenger_rms_for_damping(c_val, p, base, opts, seat_x) for c_val in cs]
-        idx_min = int(np.argmin(Js))
-        c_opt = cs[idx_min]
-    else:
-        a, b = bracket
-        f = lambda c: dJ_dc(c, p, base, opts, seat_x)
-        c_opt = bisection(f, a, b, N=25)
+        # Coarse backup: just pick the best out of a small grid
+        cs = np.linspace(c_min, c_max, 10)
+        Js = [passenger_rms_for_damping(c_val, p, base, opts_local, seat_x) for c_val in cs]
+        return float(cs[int(np.argmin(Js))])
 
+    a, b = bracket
+
+    # bisection on dJ/dc with SMALL N to keep runtime sane
+    f = lambda c: dJ_dc(c, p, base, opts_local, seat_x)
+    c_opt = bisection(f, a, b, N=10)
     return c_opt
 
 
 def damping_monte_carlo_error(p: CarParams,
                               base: BaseInput,
-                              opts: SimulationOptions,
+                              opts_local: SimulationOptions,
                               seat_x: float,
-                              n_samples: int = 50,
+                              n_samples: int = 8,
                               rel_variation: float = 0.05):
     """
-    Monte Carlo estimate of the uncertainty in the optimal damping coefficient.
+    Light Monte Carlo estimate of uncertainty in optimal damping.
 
-    This mirrors your sumpi() + inner monte_carlo_error() pattern:
+    1) Compute nominal optimal damping c_opt_nominal using root finding.
+    2) For each sample, perturb some parameters (M, k_f, k_r) by ±rel_variation.
+    3) For this perturbed set, do a *small* grid search for c_opt_pert
+       in [0.8*c_opt_nominal, 1.2*c_opt_nominal].
+    4) Use the sample variance of {c_opt_pert} to estimate SE_c.
 
-        1. Compute a nominal optimal damping c_opt_nominal.
-        2. Randomly perturb key parameters (e.g. mass and spring stiffness)
-           by ±rel_variation.
-        3. For each perturbed parameter set, recompute the optimal damping.
-        4. Use the sample variance of these optimal dampings to estimate
-           a standard error SE_c.
-        5. Return (c_opt_nominal, SE_c).
-
-    The idea is: parameter uncertainty → distribution of optimal c.
+    This mirrors the structure of sumpi()/monte_carlo_error(): generate
+    a distribution of estimates and turn its variance into an error bar.
     """
     # Step 1: nominal optimal damping
-    c_opt_nominal = optimise_damping(p, base, opts, seat_x)
+    c_opt_nominal = optimise_damping(p, base, opts_local, seat_x)
 
-    # Step 2–3: Monte Carlo over perturbed parameters
     c_opt_samples = []
 
     for _ in range(n_samples):
-        # Random scaling factors for uncertain parameters
-        scale_M = np.random.uniform(1.0 - rel_variation, 1.0 + rel_variation)
+        # Randomly perturb a few key parameters
+        scale_M  = np.random.uniform(1.0 - rel_variation, 1.0 + rel_variation)
         scale_kf = np.random.uniform(1.0 - rel_variation, 1.0 + rel_variation)
         scale_kr = np.random.uniform(1.0 - rel_variation, 1.0 + rel_variation)
 
         p_pert = CarParams(
             body_M=p.body_M * scale_M,
-            body_inertia=p.body_inertia,   # could also scale if desired
+            body_inertia=p.body_inertia,
             body_a=p.body_a,
             body_b=p.body_b,
             FWS_k=p.FWS_k * scale_kf,
-            FWD_c=p.FWD_c,                 # initial guess; will be overwritten in optimisation
+            FWD_c=p.FWD_c,
             RWS_k=p.RWS_k * scale_kr,
             RWD_c=p.RWD_c,
             FWP_theta=p.FWP_theta,
@@ -612,13 +593,17 @@ def damping_monte_carlo_error(p: CarParams,
             k_tr=p.k_tr
         )
 
-        c_opt_pert = optimise_damping(p_pert, base, opts, seat_x)
+        # Small local grid around nominal optimum
+        cs_local = np.linspace(0.8 * c_opt_nominal, 1.2 * c_opt_nominal, 5)
+        Js_local = [passenger_rms_for_damping(c_val, p_pert, base, opts_local, seat_x)
+                    for c_val in cs_local]
+        c_opt_pert = float(cs_local[int(np.argmin(Js_local))])
         c_opt_samples.append(c_opt_pert)
 
     c_opt_samples = np.array(c_opt_samples)
 
-    # Step 4: sample variance and standard error (same idea as your π code)
-    c_mean = np.mean(c_opt_samples)
+    # Sample variance & standard error (like your π code)
+    c_mean = float(np.mean(c_opt_samples))
     s_c_squared = np.sum((c_opt_samples - c_mean) ** 2) / (n_samples - 1)
     se_c = np.sqrt(s_c_squared / n_samples)
 
@@ -626,7 +611,7 @@ def damping_monte_carlo_error(p: CarParams,
 
 
 # ---------------------------------------------------------------------------
-# Example: define parameters, run simulation, optimise damping, and plot
+# Example: define parameters, optimise damping, run final sim, and plot
 # ---------------------------------------------------------------------------
 
 # Nominal car parameters (order-of-magnitude realistic values)
@@ -658,33 +643,61 @@ road_base = make_road_base(p, spline, dsdx, v=8.0, x0=0.0)
 # Initial conditions:
 # wheels start on the road, body initially level with zero velocity
 y_f0, y_r0, _, _ = road_base(0.0)
+y0_state = [
+    0.0,     # z          (body heave)
+    0.0,     # theta       (body pitch)
+    y_f0,    # z_wf        (front wheel on road at t=0)
+    y_r0,    # z_wr        (rear wheel on road at t=0)
+    0.0,     # z_dot
+    0.0,     # theta_dot
+    0.0,     # z_wf_dot
+    0.0      # z_wr_dot
+]
+
+# Full simulation options (for final plots)
 opts = SimulationOptions(
     t_span=(0.0, 20.0),
-    y_0=[
-        0.0,     # z          (body heave)
-        0.0,     # theta       (body pitch)
-        y_f0,    # z_wf        (front wheel on road at t=0)
-        y_r0,    # z_wr        (rear wheel on road at t=0)
-        0.0,     # z_dot
-        0.0,     # theta_dot
-        0.0,     # z_wf_dot
-        0.0      # z_wr_dot
-    ]
+    y_0=y0_state,
+    r_tolerance=1e-7,
+    a_tolerance=1e-9,
+    dense=True
+)
+
+# Lighter simulation options (used ONLY inside optimisation / Monte Carlo)
+opts_opt = SimulationOptions(
+    t_span=(0.0, 10.0),     # shorter horizon for optimisation
+    y_0=y0_state,
+    r_tolerance=1e-6,
+    a_tolerance=1e-8,
+    dense=True
 )
 
 # Sanity check: undamped natural frequencies of body-only model
 print("Undamped body-only natural frequencies (approx) [Hz]:",
       undamped_naturals(p))
 
-# Run ODE simulation with nominal damping (before optimisation)
-sol = run_simulation(p, road_base, opts)
+# Passenger location for comfort metric
+seat_x = 0.8  # [m] forward of CG
 
-# Sample states uniformly in time
+# ----------------- Root-finding optimisation & Monte Carlo error ------------
+
+c_opt, se_c = damping_monte_carlo_error(p, road_base, opts_opt, seat_x,
+                                        n_samples=8, rel_variation=0.05)
+
+print(f"\nOptimal (equal) damping FWD_c = RWD_c ≈ {c_opt:.2f} N·s/m")
+print(f"Monte Carlo standard error on c_opt ≈ {se_c:.2f} N·s/m")
+print(f"95% CI for c_opt ≈ {c_opt:.2f} ± {1.96 * se_c:.2f} N·s/m\n")
+
+# Update p to use optimal damping
+p.FWD_c = c_opt
+p.RWD_c = c_opt
+
+# ----------------- Final full simulation with optimal damping ---------------
+
+sol = run_simulation(p, road_base, opts)
 ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(
     sol, opts.t_span, n=2000
 )
-
-# Compute accelerations using the same RHS as the ODE
 z_dot_dot, theta_dot_dot, z_wf_dot_dot, z_wr_dot_dot = accelerations_from_rhs(
     ts,
     z, theta, z_wf, z_wr,
@@ -692,41 +705,28 @@ z_dot_dot, theta_dot_dot, z_wf_dot_dot, z_wr_dot_dot = accelerations_from_rhs(
     p,
     road_base
 )
-
-# Passenger location (ahead of CG) for comfort metric
-seat_x = 0.8  # [m] forward of CG
 a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG=seat_x)
 
-# RMS comfort metrics for nominal damping
+# RMS comfort metrics with optimal damping
 g = 9.81
 rms_z_dot_dot = rms(z_dot_dot)
 rms_pass = rms(a_pass)
 
-print(f"Nominal RMS heave accel at CG: {rms_z_dot_dot:.4f} m/s^2  "
+print(f"Optimal RMS heave accel at CG: {rms_z_dot_dot:.4f} m/s^2  "
       f"({rms_z_dot_dot / g:.4f} g)")
-print(f"Nominal RMS vertical accel at passenger (x={seat_x} m): "
+print(f"Optimal RMS vertical accel at passenger (x={seat_x} m): "
       f"{rms_pass:.4f} m/s^2  ({rms_pass / g:.4f} g)")
 
 # ---------------------------------------------------------------------------
-# Root-finding optimisation of damping + Monte Carlo error estimate
+# Plots (with optimal damping) - no wheel acceleration figure
 # ---------------------------------------------------------------------------
-
-c_opt, se_c = damping_monte_carlo_error(p, road_base, opts, seat_x,
-                                        n_samples=30, rel_variation=0.05)
-
-print(f"\nOptimal front/rear damping (FWD_c = RWD_c) from root-finding: "
-      f"{c_opt:.2f} N·s/m")
-print(f"Monte Carlo standard error of c_opt: {se_c:.2f} N·s/m")
-print(f"95% CI for c_opt ≈ {c_opt:.2f} ± {1.96 * se_c:.2f} N·s/m")
-
-# --- Plots (one per figure; no specific colors) ---
 
 # (A) Body heave displacement
 plt.figure()
 plt.plot(ts, z)
 plt.xlabel("Time [s]")
 plt.ylabel("Heave z [m]")
-plt.title("Body Heave vs Time (Nominal Damping)")
+plt.title("Body Heave vs Time (Optimal Damping)")
 plt.grid(True)
 
 # (B) Body pitch angle in degrees
@@ -734,7 +734,7 @@ plt.figure()
 plt.plot(ts, np.degrees(theta))
 plt.xlabel("Time [s]")
 plt.ylabel("Pitch θ [deg]")
-plt.title("Body Pitch vs Time (Nominal Damping)")
+plt.title("Body Pitch vs Time (Optimal Damping)")
 plt.grid(True)
 
 # (C) Passenger vertical acceleration
@@ -742,7 +742,7 @@ plt.figure()
 plt.plot(ts, a_pass)
 plt.xlabel("Time [s]")
 plt.ylabel("Vertical acceleration [m/s²]")
-plt.title(f"Passenger Vertical Accel (x = {seat_x} m from CG)")
+plt.title(f"Passenger Vertical Accel (x = {seat_x} m from CG, Optimal Damping)")
 plt.grid(True)
 
 plt.show()
