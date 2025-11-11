@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
 # 2D car (4-DOF) suspension model:
-#  - Sprung mass (body): heave z and pitch theta
-#  - Two unsprung masses: front and rear wheels (z_wf, z_wr are the vertical positions)
-#  - Linear springs/dampers in suspension, linear tyre stiffness
-#  - Car drives along a measured road profile (from CSV)
+# - Sprung mass (body): heave z and pitch theta
+# - Two unsprung masses: front and rear wheels (z_wf, z_wr are the vertical positions)
+# - Linear springs/dampers in suspension, linear tyre stiffness
+# - Car drives along a measured road profile (from CSV)
 
 from dataclasses import dataclass # Makes classes easier to read and write removing _init_ and parameter confucion
 from typing import Callable, Tuple
@@ -128,12 +128,52 @@ def build_matrices_mck(p: CarParams):
 
     return M, C, K
 
-# Finding natural frequencies of body
-def undamped_naturals(p: CarParams):
-    M, _, K = build_matrices_mck(p)
-    lam, _ = np.linalg.eig(np.linalg.solve(M, K))  # Eigenvalues of M^(-1)K
-    wn = np.sqrt(np.clip(lam, 0.0, None)) # Finding frequency (rad/s)
-    return np.sort(wn / (2 * np.pi)) # Rad/s to Hz
+
+# THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "DAMPING RATIOS FOR 4 DOFS" SHEET OF NOTES
+
+
+# This function returns the frequencies in hz for the 2 modes (bounce and pitch)
+def modal_damping_ratios(p: CarParams):
+
+    # Mass, damping and stiffness matrices
+    M, C, K = build_matrices_mck(p)
+
+    # Solve the eigenproblem from before
+    # By forming A = M^{-1} K and finding its eigenvalues and eigenvectors
+    A = np.linalg.solve(M, K)
+    eigvals, eigvecs = np.linalg.eig(A)
+
+    # Natural frequencies in rad/s
+    wn = np.sqrt(np.clip(eigvals, 0.0, None))
+
+    # Sort from lowest to highest frequency
+    order = np.argsort(wn)
+    wn = wn[order]
+    eigvecs = eigvecs[:, order]  # Columns: bounce, pitch
+
+    # Create array for damping ratios
+    zetas = np.zeros_like(wn, dtype = float)
+
+    # Iterate over the 2 modes (bounce and pitch)
+    for i in range(len(wn)):
+        phi = eigvecs[:, i]  # Mode shape for this mode (length-2 array)
+
+        # Modal mass: m_i = phi^T M phi
+        m_i = float(phi.T @ M @ phi)
+
+        # Modal stiffness: k_i = phi^T K phi
+        k_i = float(phi.T @ K @ phi)
+
+        # Modal damping: c_i = phi^T C phi
+        c_i = float(phi.T @ C @ phi)
+
+        # Damping ratio for this mode: dr_i = zeta_i / (2 * sqrt(m_i * k_i))
+        zetas[i] = c_i / (2.0 * np.sqrt(m_i * k_i))
+
+    # Convert frequencies to Hz for reporting
+    freqs_hz = wn / (2.0 * np.pi)
+
+    return freqs_hz, zetas
 
 
 # THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "THE EQUATIONS OF MOTION" SHEET OF NOTES
@@ -262,3 +302,273 @@ def occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG: float = 0.0):
 # Root mean square speed of a variable
 def rms(a):
     return float(np.sqrt(np.mean(a**2)))
+
+
+# THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "ROOT FINDING (BISECTION METHOD)" SHEET OF NOTES
+
+
+# This function uses the root finding bisection method to find root of a function f(x) = 0 between a,b
+def bisection(f, a, b, N): # N is the number of iterations
+
+    fa = f(a)
+    fb = f(b)
+
+    # Very simple algorithm, explained in the maths notes
+    if fa * fb >= 0:
+        raise ValueError("Bisection requires f(a)*f(b) < 0")
+
+    for _ in range(N):
+        m = 0.5 * (a + b)
+        fm = f(m)
+
+        if fa * fm < 0:
+            b = m
+            fb = fm
+        else:
+            a = m
+            fa = fm
+
+    return 0.5 * (a + b)
+
+
+# THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "OPTIMISATION (FINDING OPTIMAL DAMPING)" SHEET OF NOTES
+
+
+# This function returns the RMS acceleration for a passenger
+def passenger_rms_for_damping(c_f, c_r, p, base, opts_local, seat_x):
+
+    # Set parameters to our CarParams except for the damping which we are inputting ourselves
+    pars = CarParams(
+        body_M = p.body_M,
+        body_inertia = p.body_inertia,
+        body_a = p.body_a,
+        body_b = p.body_b,
+        FWS_k = p.FWS_k,
+        FWD_c = c_f,
+        RWS_k = p.RWS_k,
+        RWD_c = c_r,
+        m_wf = p.m_wf,
+        m_wr = p.m_wr,
+        k_tf = p.k_tf,
+        k_tr = p.k_tr
+    )
+
+    # Run the solver to uniformly distribut positions and velocities later with sample_states
+    sol = run_simulation(pars, base, opts_local)
+    ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts_local.t_span, n = 300)
+
+    # Find car body accelerations from the function to use in finding the acceleration of the passenger distance x from CG
+    z_dot_dot, theta_dot_dot, _, _ = accelerations_from_rhs(ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot, pars, base)
+    a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG=seat_x)
+    # Return the RMS of the passenger accel
+    return rms(a_pass)
+
+# The 2 functions below find the differentiated J(cf) and J(cr)
+
+def dJ_dc_f(c_f, c_r, p, base, opts_local, seat_x):
+    # Small step for differentiation (10% of damping coeff)
+    h = 0.1 * c_f if c_f > 0 else 1.0
+
+    J_plus = passenger_rms_for_damping(c_f + h, c_r, p, base, opts_local, seat_x)
+    J_minus = passenger_rms_for_damping(c_f - h, c_r, p, base, opts_local, seat_x)
+
+    # Returns the differentiated J(cf)
+    return (J_plus - J_minus) / (2 * h)
+
+
+def dJ_dc_r(c_f, c_r, p, base, opts_local, seat_x):
+    # Small step for differentiation (10% of damping coeff)
+    h = 0.1 * c_r if c_r > 0 else 1.0
+
+    J_plus = passenger_rms_for_damping(c_f, c_r + h, p, base, opts_local, seat_x)
+    J_minus = passenger_rms_for_damping(c_f, c_r - h, p, base, opts_local, seat_x)
+
+    # Returns the differentiated J(cf)
+    return (J_plus - J_minus) / (2 * h)
+
+# This function finds optimal cf and cr using the bisection root finding methods on the derivates of J(cf, cr)
+def optimise_damping(p, base, opts_local, seat_x,
+                               c_f_range = (100, 3000),
+                               c_r_range = (100, 3000),
+                               N = 1):
+
+    # Take initial guesses damping coefficients
+    c_f_opt = 1000.0
+    c_r_opt = 1000.0
+
+    for _ in range(N):
+
+        # Optimise the front damping (fix rear)
+        f_front = lambda c: dJ_dc_f(c, c_r_opt, p, base, opts_local, seat_x)
+        a_f, b_f = c_f_range
+        c_f_opt = bisection(f_front, a_f, b_f, N=8)
+
+        # Optimise the rear damping (fix front)
+        f_rear = lambda c: dJ_dc_r(c_f_opt, c, p, base, opts_local, seat_x)
+        a_r, b_r = c_r_range
+        c_r_opt = bisection(f_rear, a_r, b_r, N=8)
+
+    # Return optimised damping coefficient values
+    return c_f_opt, c_r_opt
+
+
+# THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "OPTIMISATION (FINDING OPTIMAL DAMPING)" SHEET OF NOTES
+
+
+# The Monte Carlo error approximation is a function I wrote as a personal project some time ago
+# It is a method of estimating error when the true value is unknown
+def damping_monte_carlo_error(p, base, opts_local, seat_x,
+                                 n_samples = 4, rel_variation = 0.05):
+
+    c_f_opt_nom, c_r_opt_nom = optimise_damping(p, base, opts_local, seat_x)
+
+    # Start by taking N samples of the values you are trying to find
+    c_f_samples = []
+    c_r_samples = []
+
+    for _ in range(n_samples):
+
+        # Random +-5% changes of mass and spring stiffness
+        scale_M = np.random.uniform(1 - rel_variation, 1 + rel_variation)
+        scale_kf = np.random.uniform(1 - rel_variation, 1 + rel_variation)
+        scale_kr = np.random.uniform(1 - rel_variation, 1 + rel_variation)
+
+        pars = CarParams(
+            body_M = p.body_M * scale_M,
+            body_inertia = p.body_inertia,
+            body_a = p.body_a,
+            body_b = p.body_b,
+            FWS_k = p.FWS_k * scale_kf,
+            FWD_c = p.FWD_c,
+            RWS_k = p.RWS_k * scale_kr,
+            RWD_c = p.RWD_c,
+            m_wf = p.m_wf,
+            m_wr = p.m_wr,
+            k_tf = p.k_tf,
+            k_tr = p.k_tr
+        )
+
+        # Find the new optimum for this random setup
+        c_f_ran, c_r_ran = optimise_damping(pars, base, opts_local, seat_x)
+        c_f_samples.append(c_f_ran)
+        c_r_samples.append(c_r_ran)
+
+    # Convert to arrays and compute Standard errors
+    c_f_samples = np.array(c_f_samples)
+    c_r_samples = np.array(c_r_samples)
+
+    cf_mean = np.mean(c_f_samples)
+    cr_mean = np.mean(c_r_samples)
+
+    s2_cf = np.sum((c_f_samples - cf_mean)**2) / (n_samples - 1)
+    s2_cr = np.sum((c_r_samples - cr_mean)**2) / (n_samples - 1)
+
+    se_cf = np.sqrt(s2_cf / n_samples)
+    se_cr = np.sqrt(s2_cr / n_samples)
+
+    return c_f_opt_nom, c_r_opt_nom, se_cf, se_cr
+
+
+# THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "MAIN SCRIPT" SHEET OF NOTES
+
+
+# Parameters of the car (Ford Fiesta ST)
+p = CarParams(
+    body_M = 1163 - (29 * 4),
+    body_inertia = 3000.0,
+    body_a = 0.996,
+    body_b = 1.494,
+
+    FWS_k = 30100,
+    FWD_c = 2000.0, # Placeholder values
+    RWS_k = 32000,
+    RWD_c = 2000.0, # Placeholder values
+
+    m_wf = 58,
+    m_wr = 58,
+    k_tf = 200000,
+    k_tr = 200000,
+)
+
+# Car travels along the measured road at a constant velocity of 8 m/s
+road_base = make_road_base(p, spline, dsdx, v = 8.0, x0 = 0.0)
+
+# Initial conditions: body height, wheels on the road, zero velocity
+y_f0, y_r0, _, _ = road_base(0.0)
+y0 = [0.0, 0.0, y_f0, y_r0, 0.0, 0.0, 0.0, 0.0]
+
+# Solver inputs, set tolerances, time span (20s to match velocity of car)
+opts = SimulationOptions(t_span = (0.0, 20.0), 
+                         y_0 = y0)
+opts_opt = SimulationOptions(t_span = (0.0, 8.0), 
+                             y_0 = y0, 
+                             r_tolerance = 1e-4, 
+                             a_tolerance = 1e-6,
+                             dense = True)
+
+ # Passenger position (m) forward of CG
+seat_x = 0.8
+
+# Optimisation (root finding with bisection) + Monte Carlo error to give optimised damping coefficient and error
+c_f_opt, c_r_opt, se_cf, se_cr = damping_monte_carlo_error(
+    p, road_base, opts_opt, seat_x,
+    n_samples = 4, rel_variation = 0.05
+)
+
+# Update parameters to the optimal values
+p.FWD_c = c_f_opt
+p.RWD_c = c_r_opt
+
+# Find damping ratios and freqs
+freqs_hz, zetas = modal_damping_ratios(p)
+
+print(f"Optimal front damping  FWD_c = {c_f_opt:.1f} Ns/m")
+print(f"Optimal rear damping RWD_c = {c_r_opt:.1f} Ns/m")
+print("Body modal properties (with optimised damping):")
+print(f"Mode 1 (bounce-ish): f = {freqs_hz[0]:.2f} Hz, damping ratio = {zetas[0]:.3f}")
+print(f"Mode 2 (pitch-ish) : f = {freqs_hz[1]:.2f} Hz, damping ratio = {zetas[1]:.3f}")
+print(f"Std. error front = {se_cf:.2f} rear = {se_cr:.2f} Ns/m")
+print(f"95% CI front: {c_f_opt:.1f} +- {1.96*se_cf:.2f}")
+print(f"95% CI rear : {c_r_opt:.1f} +- {1.96*se_cr:.2f}\n")
+
+# Final simulation using optimal damping
+sol = run_simulation(p, road_base, opts)
+ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 2000)
+z_dot_dot, theta_dot_dot, z_wf_dot_dot, z_wr_dot_dot = accelerations_from_rhs(ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot, p, road_base)
+a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG = seat_x)
+
+# Ride comfort metrics
+g = 9.81
+rms_z = rms(z_dot_dot)
+rms_pass = rms(a_pass)
+
+print(f"RMS body heave accel: {rms_z:.3f} m/s² ({rms_z/g:.3f} g)")
+print(f"RMS passenger accel : {rms_pass:.3f} m/s² ({rms_pass/g:.3f} g)")
+
+# PLOTS
+
+# Body heave
+plt.figure()
+plt.plot(ts, z, lw = 1.2)
+plt.xlabel("Time (s)")
+plt.ylabel("Heave z (m)")
+plt.title("Body heave (optimal damping)")
+plt.grid(True)
+
+# Body pitch
+plt.figure()
+plt.plot(ts, np.degrees(theta), lw = 1.2)
+plt.xlabel("Time (s)")
+plt.ylabel("Pitch θ (deg)")
+plt.title("Body pitch (optimal damping)")
+plt.grid(True)
+
+# Passenger vertical acceleration
+plt.figure()
+plt.plot(ts, a_pass, lw = 1.2)
+plt.xlabel("Time (s)")
+plt.ylabel("Vertical acceleration (m/s^2)")
+plt.title(f"Passenger vertical acceleration (x = {seat_x} m from CG)")
+plt.grid(True)
+
+plt.show()
