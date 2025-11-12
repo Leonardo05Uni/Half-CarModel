@@ -396,17 +396,20 @@ def optimise_damping(p, base, opts_local, seat_x,
     c_f_opt = 1000.0
     c_r_opt = 1000.0
 
-    for _ in range(N):
+    for G in range(1, 9):
 
         # Optimise the front damping (fix rear)
         f_front = lambda c: dJ_dc_f(c, c_r_opt, p, base, opts_local, seat_x)
         a_f, b_f = c_f_range
-        c_f_opt = bisection(f_front, a_f, b_f, N=8)
+        c_f_opt = bisection(f_front, a_f, b_f, G)
 
         # Optimise the rear damping (fix front)
         f_rear = lambda c: dJ_dc_r(c_f_opt, c, p, base, opts_local, seat_x)
         a_r, b_r = c_r_range
-        c_r_opt = bisection(f_rear, a_r, b_r, N=8)
+        c_r_opt = bisection(f_rear, a_r, b_r, G)
+
+        c_f_opt_list.append(c_f_opt)
+        c_r_opt_list.append(c_r_opt)
 
     # Return optimised damping coefficient values
     return c_f_opt, c_r_opt
@@ -467,6 +470,10 @@ def damping_monte_carlo_error(p, base, opts_local, seat_x,
     se_cr = np.sqrt(s2_cr / n_samples)
 
     return c_f_opt_nom, c_r_opt_nom, se_cf, se_cr
+
+
+c_f_opt_list = []
+c_r_opt_list = []
 
 
 # THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "MAIN SCRIPT" SHEET OF NOTES
@@ -530,6 +537,8 @@ print(f"Mode 2 (pitch-ish) : f = {freqs_hz[1]:.2f} Hz, damping ratio = {zetas[1]
 print(f"Std. error front = {se_cf:.2f} rear = {se_cr:.2f} Ns/m")
 print(f"95% CI front: {c_f_opt:.1f} +- {1.96*se_cf:.2f}")
 print(f"95% CI rear : {c_r_opt:.1f} +- {1.96*se_cr:.2f}\n")
+
+print(c_f_opt_list, c_r_opt_list)
 
 # Final simulation using optimal damping
 sol = run_simulation(p, road_base, opts)
