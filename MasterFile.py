@@ -17,9 +17,9 @@ p = CarParams(
     body_b = 1.494,
 
     FWS_k = 30100, # Front wheel spring stiffness
-    FWD_c = 2000.0, # Front wheel damping coefficient
+    FWD_c = 2000.0, # Placeholder Values
     RWS_k = 32000, # Rear wheel spring stiffness
-    RWD_c = 2000.0, # Rear wheel damping coefficient
+    RWD_c = 2000.0, # Placeholder Values
 
     m_wf = 58, # Front wheel mass
     m_wr = 58, # Rear wheel mass
@@ -91,5 +91,5 @@ print(f"RMS passenger accel : {rms_pass:.3f} m/s² ({rms_pass/g:.3f} g)")
 plot_heave(ts, z)
 plot_pitch(ts, theta)
 plot_passenger_accel(ts, a_pass, seat_x)
-plot_pass_accel_conv()
+plot_pass_accel_conv(c_f_opt_new, c_r_opt_new)
 plt.show()
