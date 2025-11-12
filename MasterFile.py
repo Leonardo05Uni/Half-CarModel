@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 #================Making the road profile from data==================
 #in here you will need to call upon the road_profile module to generate the road profile and pass along parameters, then loop through all below code for each profile
 
+c_f_opt_seq = []
+c_r_opt_seq = []
 
 p = CarParams(
     body_M = 1163 - (29 * 4), # body mass subtracting the wheel masses
@@ -46,7 +48,7 @@ opts_opt = SimulationOptions(t_span = (0.0, 8.0),
 seat_x = 0.8
 
 # Optimisation (root finding with bisection) + Monte Carlo error to give optimised damping coefficient and error
-c_f_opt, c_r_opt, se_cf, se_cr = damping_monte_carlo_error(
+c_f_opt, c_r_opt, se_cf, se_cr, c_f_opt_new, c_r_opt_new = damping_monte_carlo_error(
     p, road_base, opts_opt, seat_x,
     n_samples = 4, rel_variation = 0.05
 )
@@ -89,4 +91,5 @@ print(f"RMS passenger accel : {rms_pass:.3f} m/s² ({rms_pass/g:.3f} g)")
 plot_heave(ts, z)
 plot_pitch(ts, theta)
 plot_passenger_accel(ts, a_pass, seat_x)
+plot_pass_accel_conv()
 plt.show()

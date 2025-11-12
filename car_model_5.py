@@ -579,34 +579,32 @@ def plot_passenger_accel(ts, a_pass, seat_x):
     plt.title(f"Passenger vertical acceleration (x = {seat_x} m from CG)")
     plt.grid(True)
 
+def plot_pass_accel_conv(c_f_opt_new, c_r_opt_new):
+    plt.figure(figsize = (10, 5))
 
-# -------- ONE GRAPH, 8 LINES (paired front+rear per iteration) --------
-plt.figure(figsize = (10, 5))
+    for i, (c_f, c_r) in enumerate(zip(c_f_opt_new, c_r_opt_new), start = 1):
 
-for i, (c_f, c_r) in enumerate(zip(c_f_opt_new, c_r_opt_new), start = 1):
+        # Set bopth dampers in CarParams to the index i in the list
+        p.FWD_c = c_f
+        p.RWD_c = c_r
 
-    # set both dampers to the i-th iterate
-    p.FWD_c = c_f
-    p.RWD_c = c_r
+        # Run the simulation each time for each c
+        sol = run_simulation(p, road_base, opts)
+        ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 500)
+        z_dot_dot, theta_dot_dot, _, _ = accelerations_from_rhs(ts, z, theta, z_wf, z_wr,
+                                               z_dot, theta_dot, z_wf_dot, z_wr_dot, p, road_base)
+        a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG = seat_x)
 
-    # simulate (short window keeps the 8 traces readable)
-    sol = run_simulation(p, road_base, opts)
-    ts, z, th, z_wf, z_wr, z_dot, th_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 500)
-    z_dd, th_dd, _, _ = accelerations_from_rhs(ts, z, th, z_wf, z_wr,
-                                               z_dot, th_dot, z_wf_dot, z_wr_dot, p, road_base)
-    a_pass = occupant_vertical_accel(z_dd, th_dd, x_from_CG = seat_x)
+        # Places the last itertion on top plus a slightly bolder alpha to make it clearer in graph
+        plt.plot(ts, a_pass, lw = 1.1,
+                alpha = 1.0 if i == len(c_f_opt_new) else 0.8,
+                label = f"Step {i}: c_f={c_f:.0f}, c_r={c_r:.0f}  |  RMS={rms(a_pass):.3f} m/s^2")
 
-    # last iterate on top + slightly bolder alpha
-    plt.plot(ts, a_pass, lw=1.1,
-             alpha=1.0 if i == len(c_f_opt_new) else 0.8,
-             label=f"Step {i}: c_f={c_f:.0f}, c_r={c_r:.0f}  |  RMS={rms(a_pass):.3f} m/s²")
-
-# styling
-plt.axhline(0, ls='--', lw=1)
-plt.grid(True, alpha=0.3)
-plt.xlabel("Time (s)")
-plt.ylabel("Passenger vertical acceleration [m/s²]")
-plt.title("Passenger acceleration convergence — paired front & rear damping per bisection step")
-plt.legend(loc="upper right", fontsize=8, frameon=True)
-plt.tight_layout()
-plt.show()
+    # Styling
+    plt.axhline(0, ls = '--', lw = 1)
+    plt.grid(True, alpha = 0.3)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Passenger vertical acceleration (m/s^2)")
+    plt.title("Passenger acceleration convergence")
+    plt.legend(loc = "upper right", fontsize = 8, frameon = True)
+    plt.tight_layout()
