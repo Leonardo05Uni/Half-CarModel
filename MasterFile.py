@@ -13,8 +13,8 @@ c_r_opt_seq = []
 p = CarParams(
     body_M = 1163 - (29 * 4), # body mass subtracting the wheel masses
     body_inertia = 3000.0,
-    body_a = 0.996,
-    body_b = 1.494,
+    body_a = 0.996, # Distance from CG to front axle
+    body_b = 1.494, # Distance from CG to rear axle
 
     FWS_k = 30100, # Front wheel spring stiffness
     FWD_c = 2000.0, # Placeholder Values
@@ -28,6 +28,7 @@ p = CarParams(
 )
 
 #=================== run simulation starting here===================
+
 # Car travels along the measured road at a constant velocity of 8 m/s
 road_base = make_road_base(p, spline, dsdx, v = 8.0, x0 = 0.0)
 
@@ -38,6 +39,10 @@ y0 = [0.0, 0.0, y_f0, y_r0, 0.0, 0.0, 0.0, 0.0]
 # Solver inputs, set tolerances, time span (20s to match velocity of car)
 opts = SimulationOptions(t_span = (0.0, 20.0), 
                          y_0 = y0)
+
+# Simulation options for the optimal parameters (does not need to be that accurate, 20s timespan breaks computers)
+# That being said, for the record, front and rear damping with 20s span is about 1570 and 513 (Took 10 minutes to run)
+# RMS accel stays roughly the same at 1.228 compared to 1.234
 opts_opt = SimulationOptions(t_span = (0.0, 8.0), 
                              y_0 = y0, 
                              r_tolerance = 1e-4, 
