@@ -522,6 +522,9 @@ c_f_opt, c_r_opt, se_cf, se_cr = damping_monte_carlo_error(
     n_samples = 4, rel_variation = 0.05
 )
 
+c_f_opt_new = c_f_opt_list[-8:] 
+c_r_opt_new = c_f_opt_list[-8:]
+
 # Update parameters to the optimal values
 p.FWD_c = c_f_opt
 p.RWD_c = c_r_opt
@@ -538,7 +541,7 @@ print(f"Std. error front = {se_cf:.2f} rear = {se_cr:.2f} Ns/m")
 print(f"95% CI front: {c_f_opt:.1f} +- {1.96*se_cf:.2f}")
 print(f"95% CI rear : {c_r_opt:.1f} +- {1.96*se_cr:.2f}\n")
 
-print(c_f_opt_list, c_r_opt_list)
+print(c_f_opt_new, c_r_opt_new)
 
 # Final simulation using optimal damping
 sol = run_simulation(p, road_base, opts)
