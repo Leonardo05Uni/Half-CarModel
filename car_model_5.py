@@ -396,20 +396,23 @@ def optimise_damping(p, base, opts_local, seat_x,
     c_f_opt = 1000.0
     c_r_opt = 1000.0
 
-    for _ in range(N):
+    for G in range(1, 9):
 
         # Optimise the front damping (fix rear)
         f_front = lambda c: dJ_dc_f(c, c_r_opt, p, base, opts_local, seat_x)
         a_f, b_f = c_f_range
-        c_f_opt = bisection(f_front, a_f, b_f, N=8)
+        c_f_opt = bisection(f_front, a_f, b_f, G)
 
         # Optimise the rear damping (fix front)
         f_rear = lambda c: dJ_dc_r(c_f_opt, c, p, base, opts_local, seat_x)
         a_r, b_r = c_r_range
-        c_r_opt = bisection(f_rear, a_r, b_r, N=8)
+        c_r_opt = bisection(f_rear, a_r, b_r, G)
+
+        c_f_opt_seq.append(c_f_opt)
+        c_r_opt_seq.append(c_r_opt)
 
     # Return optimised damping coefficient values
-    return c_f_opt, c_r_opt
+    return c_f_opt, c_r_opt, c_f_opt_seq[-8:], c_r_opt_seq[-8:]
 
 
 # THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "OPTIMISATION (FINDING OPTIMAL DAMPING)" SHEET OF NOTES
@@ -420,7 +423,7 @@ def optimise_damping(p, base, opts_local, seat_x,
 def damping_monte_carlo_error(p, base, opts_local, seat_x,
                                  n_samples = 4, rel_variation = 0.05):
 
-    c_f_opt_nom, c_r_opt_nom = optimise_damping(p, base, opts_local, seat_x)
+    c_f_opt_nom, c_r_opt_nom, c_f_list, c_r_list = optimise_damping(p, base, opts_local, seat_x)
 
     # Start by taking N samples of the values you are trying to find
     c_f_samples = []
@@ -449,7 +452,7 @@ def damping_monte_carlo_error(p, base, opts_local, seat_x,
         )
 
         # Find the new optimum for this random setup
-        c_f_ran, c_r_ran = optimise_damping(pars, base, opts_local, seat_x)
+        c_f_ran, c_r_ran, _, _ = optimise_damping(pars, base, opts_local, seat_x)
         c_f_samples.append(c_f_ran)
         c_r_samples.append(c_r_ran)
 
@@ -466,11 +469,14 @@ def damping_monte_carlo_error(p, base, opts_local, seat_x,
     se_cf = np.sqrt(s2_cf / n_samples)
     se_cr = np.sqrt(s2_cr / n_samples)
 
-    return c_f_opt_nom, c_r_opt_nom, se_cf, se_cr
+    return c_f_opt_nom, c_r_opt_nom, se_cf, se_cr, c_f_list, c_r_list
 
 
 # THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "MAIN SCRIPT" SHEET OF NOTES
 
+
+c_f_opt_seq = []
+c_r_opt_seq = []
 
 # Parameters of the car (Ford Fiesta ST)
 p = CarParams(
@@ -510,7 +516,7 @@ opts_opt = SimulationOptions(t_span = (0.0, 8.0),
 seat_x = 0.8
 
 # Optimisation (root finding with bisection) + Monte Carlo error to give optimised damping coefficient and error
-c_f_opt, c_r_opt, se_cf, se_cr = damping_monte_carlo_error(
+c_f_opt, c_r_opt, se_cf, se_cr, c_f_opt_new, c_r_opt_new = damping_monte_carlo_error(
     p, road_base, opts_opt, seat_x,
     n_samples = 4, rel_variation = 0.05
 )
@@ -572,3 +578,35 @@ def plot_passenger_accel(ts, a_pass, seat_x):
     plt.ylabel("Vertical acceleration (m/s^2)")
     plt.title(f"Passenger vertical acceleration (x = {seat_x} m from CG)")
     plt.grid(True)
+
+
+# -------- ONE GRAPH, 8 LINES (paired front+rear per iteration) --------
+plt.figure(figsize = (10, 5))
+
+for i, (c_f, c_r) in enumerate(zip(c_f_opt_new, c_r_opt_new), start = 1):
+
+    # set both dampers to the i-th iterate
+    p.FWD_c = c_f
+    p.RWD_c = c_r
+
+    # simulate (short window keeps the 8 traces readable)
+    sol = run_simulation(p, road_base, opts)
+    ts, z, th, z_wf, z_wr, z_dot, th_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 500)
+    z_dd, th_dd, _, _ = accelerations_from_rhs(ts, z, th, z_wf, z_wr,
+                                               z_dot, th_dot, z_wf_dot, z_wr_dot, p, road_base)
+    a_pass = occupant_vertical_accel(z_dd, th_dd, x_from_CG = seat_x)
+
+    # last iterate on top + slightly bolder alpha
+    plt.plot(ts, a_pass, lw=1.1,
+             alpha=1.0 if i == len(c_f_opt_new) else 0.8,
+             label=f"Step {i}: c_f={c_f:.0f}, c_r={c_r:.0f}  |  RMS={rms(a_pass):.3f} m/s²")
+
+# styling
+plt.axhline(0, ls='--', lw=1)
+plt.grid(True, alpha=0.3)
+plt.xlabel("Time (s)")
+plt.ylabel("Passenger vertical acceleration [m/s²]")
+plt.title("Passenger acceleration convergence — paired front & rear damping per bisection step")
+plt.legend(loc="upper right", fontsize=8, frameon=True)
+plt.tight_layout()
+plt.show()
