@@ -546,29 +546,29 @@ print(f"RMS body heave accel: {rms_z:.3f} m/s² ({rms_z/g:.3f} g)")
 print(f"RMS passenger accel : {rms_pass:.3f} m/s² ({rms_pass/g:.3f} g)")
 
 # PLOTS
-
 # Body heave
-plt.figure()
-plt.plot(ts, z, lw = 1.2)
-plt.xlabel("Time (s)")
-plt.ylabel("Heave z (m)")
-plt.title("Body heave (optimal damping)")
-plt.grid(True)
+def plot_heave(ts, z):
+    plt.figure()
+    plt.plot(ts, z, lw = 1.2)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Heave z (m)")
+    plt.title("Body heave (optimal damping)")
+    plt.grid(True)
 
 # Body pitch
-plt.figure()
-plt.plot(ts, np.degrees(theta), lw = 1.2)
-plt.xlabel("Time (s)")
-plt.ylabel("Pitch θ (deg)")
-plt.title("Body pitch (optimal damping)")
-plt.grid(True)
+def plot_pitch(ts, theta):
+    plt.figure()
+    plt.plot(ts, np.degrees(theta), lw = 1.2)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Pitch θ (deg)")
+    plt.title("Body pitch (optimal damping)")
+    plt.grid(True)
 
 # Passenger vertical acceleration
-plt.figure()
-plt.plot(ts, a_pass, lw = 1.2)
-plt.xlabel("Time (s)")
-plt.ylabel("Vertical acceleration (m/s^2)")
-plt.title(f"Passenger vertical acceleration (x = {seat_x} m from CG)")
-plt.grid(True)
-
-plt.show()
+def plot_passenger_accel(ts, a_pass, seat_x):
+    plt.figure()
+    plt.plot(ts, a_pass, lw = 1.2)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Vertical acceleration (m/s^2)")
+    plt.title(f"Passenger vertical acceleration (x = {seat_x} m from CG)")
+    plt.grid(True)
