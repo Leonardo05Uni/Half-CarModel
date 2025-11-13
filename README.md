@@ -52,15 +52,6 @@ Front and rear suspensions act as spring–damper pairs located at distances \( 
 - Road surface is defined by flat, bump, pothole, and random surfaces  
 - Air resistance and rolling friction are ignored  
 
-
-**The ODEs are solved using `scipy.integrate.solve_ivp` (Runge–Kutta RK45) with adaptive time-stepping and dense output.** 
-### Numerical Simulation
-- Programming Language: Python 3  
-- Libraries: NumPy · SciPy · Matplotlib · Pandas  
-- Integration method: RK45 (`solve_ivp`)  
-- Sampling frequency: adaptive (dense output = True)  
-- Post-processing: RMS acceleration calculation and plot generation
-
 ## Project File Overview
 
 ### MasterFile.py
@@ -108,7 +99,9 @@ A quick test file for a single speed bump.
 Just a CSV file with two columns — distance and height (metres)  
 - It’s mainly for checking or plotting the road surface
  
-### Two images
+### Two images  
+**image_2025-11-10_134556331.png / image_2025-11-10_134858877.png**  
+
 Those two images displays the composition of unsprung mass and the tyre vertical stiffness range (150-300 kN/m)  
 
 ### Suffix Meaning
@@ -150,6 +143,27 @@ Those two images displays the composition of unsprung mass and the tyre vertical
 | `_delta_r`    | Suspension deflection at rear (`(z - bθ) - z_wr`) |
 | `_F_s`        | Suspension force (spring + damper) |
 | `_F_t`        | Tyre force |
+ 
+## How to Run the code? 
+**Programming language: Python 3**  
+**1. Open Masterfile.py and this model will automatically import all of the modules below:**
+   - car_model_5.py
+   - road_profile.py
+   - speed_bump.py
+
+**2. Python Libraries required:**  
+   - `numpy`, `scipy`, `matplotlib`, `pandas`  
+   **How to install?**  
+   Via pip:  
+   pip install numpy scipy matplotlib pandas
+
+**3. What happens when the code is running?**  
+   - First off, the script called `road_profile.py` would generate a road input —— `bumpy_road_cords.csv`
+   - Secondly, it runs the dynamic model from `car_model_5.py` via `rhs_car()` by using `solve_ivp`
+   - Then the RMS acceleration would be generated automatically
+   - At last the plottings including `Body Heave vs Time`, `Body Pitch vs Time`, `Passenger Vertical Accel (x={seat_x} m from CG)` and `Unsprung (wheel) accelerations`  
+     would be generated.
+    
 
 ## RMS Acceleration and Ride Comfort Analysis
 
