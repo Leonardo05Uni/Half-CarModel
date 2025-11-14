@@ -4,13 +4,15 @@
 Nigel Cheung, Boming Xiao, Floris Hijink, Leonardo Maffei Mercalli, Dimitri Rao  
 
 ## Overview
-The suspension system has a huge impact on how a car reacts to bumpy or uneven roads — it pretty much decides how stable and comfortable the ride feels.  
-This project simulates a car travelling over a rough road to investigate how variations in spring stiffness and damping coefficients affect the vertical (heave) and rotational (pitch) motion of the vehicle.  
+The suspension system has a huge impact on how a car reacts to bumpy or uneven roads — it pretty much decides how stable and comfortable the ride feels.
+
+This project simulates a car travelling over a rough road to investigate how variations in spring stiffness and damping coefficients affect the vertical (heave) and rotational (pitch) motion of the vehicle.
+
 The simulation provides a physically meaningful representation of vehicle dynamics, which is focused on rideing comfort and vibration controlling through suspension tuning.  
 
 **The reallife example:**  
 Car: 2018 Ford Fiesta ST Line 5dr, 1.0L.  
-(https://media.ford.com/content/dam/fordmedia/Europe/documents/productReleases/Fiesta/FordFiesta2017_FiestaDrive_TechSpecs_EU.pdf)  
+https://media.ford.com/content/dam/fordmedia/Europe/documents/productReleases/Fiesta/FordFiesta2017_FiestaDrive_TechSpecs_EU.pdf 
 
 
 ### Project Objectives  
@@ -21,9 +23,9 @@ Our main goals are：
 - Find a combination of parameters that gives the smoothest ride, using RMS acceleration as a measure of comfort.  
 
 ### System Component / Positions Names
-(number reference those found in figure 1 on 'Model drawing - car v2.png')  
+(number reference those found in figure 1 on `Model drawing - car v2.png`)  
 
-The vehicle is modelled as a 4-DOF half-car system consisting of:
+The vehicle is modelled as a half-car system consisting of:
 - **Sprung mass** which is the vehicle body  
 - **Front and rear unsprung masses** about the wheels and axles   
 - **Suspension springs/dampers** connecting the body to the wheels  
@@ -56,13 +58,13 @@ Front and rear suspensions act as spring–damper pairs located at distances \( 
 
 ### MasterFile.py
 Main control script
-- imported parameters from "car_model_5.py"
-- imported road layout from "road_profile.py" and "speed_bump.py"
+- imported parameters from `car_model_5.py`
+- imported road layout from "road_profile.py" and `speed_bump.py`
 - set up the initial conditions
-- imported time integration through "run_simulation()"
+- imported time integration through `run_simulation()`
 - performed Monte Carlo–based damping optimization by (`damping_monte_carlo_error`)  
 - computed RMS accelerations and ISO 2631-1 comfort levels
-- generated plots including "Body Heave vs Time", "Body Pitch vs Time", "Passenger Vertical Accel (x={seat_x} m from CG)" and "Unsprung (wheel) accelerations".
+- generated plots including `Body Heave vs Time`, `Body Pitch vs Time`, `Passenger Vertical Accel (x={seat_x} m from CG)` and `Unsprung (wheel) accelerations`.
 
 
 ### Model drawing – car v2.png  
@@ -72,27 +74,27 @@ Diagram showing the simplified 2-DOF suspension layout.
 ### car_model_2.py  
 Main script for the 2-DOF car body model  
 - This is the main script where the 4-DOF car model runs  
-- It sets the mass, damping,tyre and stiffness values, calls the motion equations from rhs_car()  
+- It sets the mass, damping,tyre and stiffness values, calls the motion equations from `rhs_car()`  
 - Runs the simulation through `run_simulation()` using SciPy’s `solve_ivp`  
 
 ### car_model_5.py  
 More car model information added, includes:
 - wheel masses (`m_wf`, `m_wr`), tyre stiffness (`k_tf`, `k_tr`)
 - defined `CarParams` and  `SimulationOptions`
-- Formulates the system differential equations in rhs_car() and defines the equations of motion
-- Performs numerical integration using scipy.integrate.solve_ivp
+- Formulates the system differential equations in `rhs_car()` and defines the equations of motion
+- Performs numerical integration using `scipy.integrate.solve_ivp`
 - Includes modal analysis, RMS evaluation, and passenger acceleration output functions
 
 ### road_profile.py  
 - generates road profiles such as bumps and potholes using mathematical functions
 - supports composite and spline-based surface construction
 - allows combination of potholes, surface roughness, and gradients for realistic road shapes
-- exports height data to bumpy_road_cords.csv
-- being imported in MasterFile.py to create realistic road inputs for the vehicle model
+- exports height data to `bumpy_road_cords.csv`
+- being imported in `MasterFile.py` to create realistic road inputs for the vehicle model
 
 ### speed_bump.py  
 A quick test file for a single speed bump.  
-- It calculates the bump height h(x) and time-based h_dot(x, speed)  
+- It calculates the bump height `h(x)` and time-based `h_dot(x, speed)`  
 - to check how the suspension behaves at different car speeds
 
 ### bumpy_road_cords.csv    
@@ -152,8 +154,10 @@ Those two images displays the composition of unsprung mass and the tyre vertical
    - speed_bump.py
 
 **2. Python Libraries required:**  
-   - `numpy`, `scipy`, `matplotlib`, `pandas`  
+   - `numpy`, `scipy`, `matplotlib`, `pandas`
+
    **How to install?**  
+   
    Via pip:  
    pip install numpy scipy matplotlib pandas
 
@@ -163,7 +167,28 @@ Those two images displays the composition of unsprung mass and the tyre vertical
    - Then the RMS acceleration would be generated automatically
    - At last the plottings including `Body Heave vs Time`, `Body Pitch vs Time`, `Passenger Vertical Accel (x={seat_x} m from CG)` and `Unsprung (wheel) accelerations`  
      would be generated.
-    
+
+## Numerical Methods Implementation  
+
+1. **Root finding**  
+   Location -- `Masterfile.py`, function: `find_equilibrium()`
+   
+   It solves the equation of the suspension system when it is at equilibrium state, when total force=0  
+   Uses the scipy.optimize.root_scalar() to determine the height of steady-state ride before dynamic simulation.  
+   
+3. **Ordinary Differential Equations (ODEs)**   
+   Location -- `car_model_5.py`, function: `rhs_car()`
+   
+   Defines the governing motion equations for the car model including heave, pitch and wheel vertical motion. etc.  
+   Integrated over time by using `scipy.integrate.solve_ivp` with RK45 Method.  
+
+5. **Regression**  
+   Location -- `road_profile.py`, function: `generate_bumpy_road()`  
+
+   It uses interpolation techniques (`scipy.interpolate.interp1d`) to make the height points of discrete road smoother.  
+   It generates continuous road surfaces including bumps, potholes and random roughness.  
+   
+   
 
 ## RMS Acceleration and Ride Comfort Analysis
 
