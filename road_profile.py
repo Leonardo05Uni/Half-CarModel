@@ -42,7 +42,7 @@ def generate_bumpy_road(length=100, resolution=0.01, incline=0,
         #Step height is 0.025m (https://streetsolutionsuk.co.uk/blogs/news/the-ultimate-guide-to-speed-bump-regulations-uk)
         step_height = 0.025
 
-        n = 2  
+        n = 2  #Modelled as an x^2 graph
         core_bump = (1 - x_local**n) * (bump_height - step_height)
         core_bump[np.abs(x_local) > 1] = 0  
 
@@ -83,13 +83,13 @@ def generate_bumpy_road(length=100, resolution=0.01, incline=0,
     # Define a mask for flat regions (regions not affected by bumps or potholes)
     flat_region = np.ones_like(y, dtype=bool)
 
-    # Mask out bumps
+    # Keeping bumps perfectly smooth
     for pos in bump_positions:
         left_edge = pos - bump_width / 2
         right_edge = pos + bump_width / 2
         flat_region[(x >= left_edge) & (x <= right_edge)] = False
 
-    # Mask out potholes
+    # Keeping potholes perfectly smooth
     for pos in pothole_positions:
         left_edge = pos - pothole_width / 2
         right_edge = pos + pothole_width / 2
