@@ -189,7 +189,7 @@ Those two images displays the composition of unsprung mass and the tyre vertical
    Defines the governing motion equations for the car model including heave, pitch and wheel vertical motion. etc.  
    Integrated over time by using `scipy.integrate.solve_ivp` with RK45 Method.  
 
-5. **Regression**  
+5. **Interpolation**  
    Location -- `road_profile.py`, function: `generate_bumpy_road()`  
 
    It uses interpolation techniques (`scipy.interpolate.interp1d`) to make the height points of discrete road smoother.  
