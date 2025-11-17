@@ -65,7 +65,7 @@ Main control script
 - performed Monte Carlo–based damping optimization by (`damping_monte_carlo_error`)  
 - computed RMS accelerations and ISO 2631-1 comfort levels
 - generated plots including `Body Heave vs Time`, `Body Pitch vs Time`, `Passenger Vertical Accel (x={seat_x} m from CG)` and `Unsprung (wheel) accelerations`.
-
+- can be used for every road profile and car type by changing the parameters.
 
 ### Model drawing – car v2.png  
 Diagram showing the simplified 2-DOF suspension layout.  
@@ -162,11 +162,18 @@ Those two images displays the composition of unsprung mass and the tyre vertical
    pip install numpy scipy matplotlib pandas
 
 **3. What happens when the code is running?**  
+    (if Masterfile.py is not running, just open it manually following the instructions below:)  
    - First off, the script called `road_profile.py` would generate a road input —— `bumpy_road_cords.csv`
    - Secondly, it runs the dynamic model from `car_model_5.py` via `rhs_car()` by using `solve_ivp`
    - Then the RMS acceleration would be generated automatically
    - At last the plottings including `Body Heave vs Time`, `Body Pitch vs Time`, `Passenger Vertical Accel (x={seat_x} m from CG)` and `Unsprung (wheel) accelerations`  
      would be generated.
+
+**4. What if changing the road profile and car type?**
+   - All the parameters can be changed in `Masterfile.py` maually, which means every road profile and car type would be simulated through our coding.  
+   - For instance, by modifying the vehicle properties (mass, stiffness, damping, etc.) to match a specific car model, the program could automatically produce the corresponding
+     simulated dynamic response for that vehicle.
+
 
 ## Numerical Methods Implementation  
 
