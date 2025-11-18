@@ -55,11 +55,15 @@ class SimulationOptions:
 BaseInput = Callable[[float], Tuple[float, float, float, float]]
 
 # Import CSV
-df = pd.read_csv("bumpy_road_cords.csv")
-x = df["distance"].values # Distance labelled as x
-y = df["height"].values # Road height labelled as y
+def csv_reader(road_csv_path: str):
+    df = pd.read_csv(road_csv_path)
+    x = df["distance"].values # Distance labelled as x
+    y = df["height"].values # Road height labelled as y
+    return x, y
 
 # Smooth road profile y(x) using UnivariateSpline import 
+x, y = csv_reader("bumpy_road_cords.csv")
+
 spline = UnivariateSpline(x, y, s = 0.4) # s = 0.4 is used to define how smooth you want the curve to be, higher value more smooth
 dsdx = spline.derivative() # dy/dx for road inputs later
 
@@ -474,137 +478,126 @@ def damping_monte_carlo_error(p, base, opts_local, seat_x,
 
 # THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "MAIN SCRIPT" SHEET OF NOTES
 
-
 c_f_opt_seq = []
 c_r_opt_seq = []
 
-# Parameters of the car (Ford Fiesta ST)
-p = CarParams(
-    body_M = 1163 - (29 * 4),
-    body_inertia = 3000.0,
-    body_a = 0.996,
-    body_b = 1.494,
+def main(p):
 
-    FWS_k = 30100,
-    FWD_c = 2000.0, # Placeholder values
-    RWS_k = 32000,
-    RWD_c = 2000.0, # Placeholder values
+    # Car travels along the measured road at a constant velocity of 8 m/s
+    road_base = make_road_base(p, spline, dsdx, v = 8.0, x0 = 0.0)
 
-    m_wf = 58,
-    m_wr = 58,
-    k_tf = 200000,
-    k_tr = 200000,
-)
+    # Initial conditions: body height, wheels on the road, zero velocity
+    y_f0, y_r0, _, _ = road_base(0.0)
+    y0 = [0.0, 0.0, y_f0, y_r0, 0.0, 0.0, 0.0, 0.0]
 
-# Car travels along the measured road at a constant velocity of 8 m/s
-road_base = make_road_base(p, spline, dsdx, v = 8.0, x0 = 0.0)
+    # Solver inputs, set tolerances, time span (20s to match velocity of car)
+    opts = SimulationOptions(t_span = (0.0, 20.0), 
+                            y_0 = y0)
+    opts_opt = SimulationOptions(t_span = (0.0, 8.0), 
+                                y_0 = y0, 
+                                r_tolerance = 1e-4, 
+                                a_tolerance = 1e-6,
+                                dense = True)
 
-# Initial conditions: body height, wheels on the road, zero velocity
-y_f0, y_r0, _, _ = road_base(0.0)
-y0 = [0.0, 0.0, y_f0, y_r0, 0.0, 0.0, 0.0, 0.0]
+    # Passenger position (m) forward of CG
+    seat_x = 0.8
 
-# Solver inputs, set tolerances, time span (20s to match velocity of car)
-opts = SimulationOptions(t_span = (0.0, 20.0), 
-                         y_0 = y0)
-opts_opt = SimulationOptions(t_span = (0.0, 8.0), 
-                             y_0 = y0, 
-                             r_tolerance = 1e-4, 
-                             a_tolerance = 1e-6,
-                             dense = True)
-
- # Passenger position (m) forward of CG
-seat_x = 0.8
-
-# Optimisation (root finding with bisection) + Monte Carlo error to give optimised damping coefficient and error
-c_f_opt, c_r_opt, se_cf, se_cr, c_f_opt_new, c_r_opt_new = damping_monte_carlo_error(
+    # Optimisation (root finding with bisection) + Monte Carlo error to give optimised damping coefficient and error
+    c_f_opt, c_r_opt, se_cf, se_cr, c_f_opt_new, c_r_opt_new = damping_monte_carlo_error(
     p, road_base, opts_opt, seat_x,
     n_samples = 4, rel_variation = 0.05
-)
+    )
 
-# Update parameters to the optimal values
-p.FWD_c = c_f_opt
-p.RWD_c = c_r_opt
+    # Update parameters to the optimal values
+    p.FWD_c = c_f_opt
+    p.RWD_c = c_r_opt
 
-# Find damping ratios and freqs
-freqs_hz, zetas = modal_damping_ratios(p)
+    # Find damping ratios and freqs
+    freqs_hz, zetas = modal_damping_ratios(p)
 
-print(f"Optimal front damping  FWD_c = {c_f_opt:.1f} Ns/m")
-print(f"Optimal rear damping RWD_c = {c_r_opt:.1f} Ns/m")
-print("Body modal properties (with optimised damping):")
-print(f"Mode 1 (bounce-ish): f = {freqs_hz[0]:.2f} Hz, damping ratio = {zetas[0]:.3f}")
-print(f"Mode 2 (pitch-ish) : f = {freqs_hz[1]:.2f} Hz, damping ratio = {zetas[1]:.3f}")
-print(f"Std. error front = {se_cf:.2f} rear = {se_cr:.2f} Ns/m")
-print(f"95% CI front: {c_f_opt:.1f} +- {1.96*se_cf:.2f}")
-print(f"95% CI rear : {c_r_opt:.1f} +- {1.96*se_cr:.2f}\n")
+    print(f"Optimal front damping  FWD_c = {c_f_opt:.1f} Ns/m")
+    print(f"Optimal rear damping RWD_c = {c_r_opt:.1f} Ns/m")
+    print("Body modal properties (with optimised damping):")
+    print(f"Mode 1 (bounce-ish): f = {freqs_hz[0]:.2f} Hz, damping ratio = {zetas[0]:.3f}")
+    print(f"Mode 2 (pitch-ish) : f = {freqs_hz[1]:.2f} Hz, damping ratio = {zetas[1]:.3f}")
+    print(f"Std. error front = {se_cf:.2f} rear = {se_cr:.2f} Ns/m")
+    print(f"95% CI front: {c_f_opt:.1f} +- {1.96*se_cf:.2f}")
+    print(f"95% CI rear : {c_r_opt:.1f} +- {1.96*se_cr:.2f}\n")
 
-# Final simulation using optimal damping
-sol = run_simulation(p, road_base, opts)
-ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 2000)
-z_dot_dot, theta_dot_dot, z_wf_dot_dot, z_wr_dot_dot = accelerations_from_rhs(ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot, p, road_base)
-a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG = seat_x)
+    # Final simulation using optimal damping
+    sol = run_simulation(p, road_base, opts)
+    ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 2000)
+    z_dot_dot, theta_dot_dot, z_wf_dot_dot, z_wr_dot_dot = accelerations_from_rhs(ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot, p, road_base)
+    a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG = seat_x)
 
-# Ride comfort metrics
-g = 9.81
-rms_z = rms(z_dot_dot)
-rms_pass = rms(a_pass)
+    # Ride comfort metrics
+    g = 9.81
+    rms_z = rms(z_dot_dot)
+    rms_pass = rms(a_pass)
 
-print(f"RMS body heave accel: {rms_z:.3f} m/s² ({rms_z/g:.3f} g)")
-print(f"RMS passenger accel : {rms_pass:.3f} m/s² ({rms_pass/g:.3f} g)")
+    print(f"RMS body heave accel: {rms_z:.3f} m/s² ({rms_z/g:.3f} g)")
+    print(f"RMS passenger accel : {rms_pass:.3f} m/s² ({rms_pass/g:.3f} g)")
 
-# PLOTS
-# Body heave
-def plot_heave(ts, z):
-    plt.figure()
-    plt.plot(ts, z, lw = 1.2)
-    plt.xlabel("Time (s)")
-    plt.ylabel("Heave z (m)")
-    plt.title("Body heave (optimal damping)")
-    plt.grid(True)
+    # PLOTS
+    # Body heave
+    def plot_heave(ts, z):
+        plt.figure()
+        plt.plot(ts, z, lw = 1.2)
+        plt.xlabel("Time (s)")
+        plt.ylabel("Heave z (m)")
+        plt.title("Body heave (optimal damping)")
+        plt.grid(True)
 
-# Body pitch
-def plot_pitch(ts, theta):
-    plt.figure()
-    plt.plot(ts, np.degrees(theta), lw = 1.2)
-    plt.xlabel("Time (s)")
-    plt.ylabel("Pitch θ (deg)")
-    plt.title("Body pitch (optimal damping)")
-    plt.grid(True)
+    # Body pitch
+    def plot_pitch(ts, theta):
+        plt.figure()
+        plt.plot(ts, np.degrees(theta), lw = 1.2)
+        plt.xlabel("Time (s)")
+        plt.ylabel("Pitch θ (deg)")
+        plt.title("Body pitch (optimal damping)")
+        plt.grid(True)
 
-# Passenger vertical acceleration
-def plot_passenger_accel(ts, a_pass, seat_x):
-    plt.figure()
-    plt.plot(ts, a_pass, lw = 1.2)
-    plt.xlabel("Time (s)")
-    plt.ylabel("Vertical acceleration (m/s^2)")
-    plt.title(f"Passenger vertical acceleration (x = {seat_x} m from CG)")
-    plt.grid(True)
+    # Passenger vertical acceleration
+    def plot_passenger_accel(ts, a_pass, seat_x):
+        plt.figure()
+        plt.plot(ts, a_pass, lw = 1.2)
+        plt.xlabel("Time (s)")
+        plt.ylabel("Vertical acceleration (m/s^2)")
+        plt.title(f"Passenger vertical acceleration (x = {seat_x} m from CG)")
+        plt.grid(True)
 
-def plot_pass_accel_conv(c_f_opt_new, c_r_opt_new):
-    plt.figure(figsize = (10, 5))
+    def plot_pass_accel_conv(c_f_opt_new, c_r_opt_new):
+        plt.figure(figsize = (10, 5))
 
-    for i, (c_f, c_r) in enumerate(zip(c_f_opt_new, c_r_opt_new), start = 1):
+        for i, (c_f, c_r) in enumerate(zip(c_f_opt_new, c_r_opt_new), start = 1):
 
-        # Set bopth dampers in CarParams to the index i in the list
-        p.FWD_c = c_f
-        p.RWD_c = c_r
+            # Set bopth dampers in CarParams to the index i in the list
+            p.FWD_c = c_f
+            p.RWD_c = c_r
 
-        # Run the simulation each time for each c
-        sol = run_simulation(p, road_base, opts)
-        ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 500)
-        z_dot_dot, theta_dot_dot, _, _ = accelerations_from_rhs(ts, z, theta, z_wf, z_wr,
-                                               z_dot, theta_dot, z_wf_dot, z_wr_dot, p, road_base)
-        a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG = seat_x)
+            # Run the simulation each time for each c
+            sol = run_simulation(p, road_base, opts)
+            ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 500)
+            z_dot_dot, theta_dot_dot, _, _ = accelerations_from_rhs(ts, z, theta, z_wf, z_wr,
+                                                z_dot, theta_dot, z_wf_dot, z_wr_dot, p, road_base)
+            a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG = seat_x)
 
-        # Places the last itertion on top plus a slightly bolder alpha to make it clearer in graph
-        plt.plot(ts, a_pass, lw = 1.1,
-                alpha = 1.0 if i == len(c_f_opt_new) else 0.8,
-                label = f"Step {i}: c_f={c_f:.0f}, c_r={c_r:.0f}  |  RMS={rms(a_pass):.3f} m/s^2")
+            # Places the last itertion on top plus a slightly bolder alpha to make it clearer in graph
+            plt.plot(ts, a_pass, lw = 1.1,
+                    alpha = 1.0 if i == len(c_f_opt_new) else 0.8,
+                    label = f"Step {i}: c_f={c_f:.0f}, c_r={c_r:.0f}  |  RMS={rms(a_pass):.3f} m/s^2")
 
-    # Styling
-    plt.axhline(0, ls = '--', lw = 1)
-    plt.grid(True, alpha = 0.3)
-    plt.xlabel("Time (s)")
-    plt.ylabel("Passenger vertical acceleration (m/s^2)")
-    plt.title("Passenger acceleration convergence")
-    plt.legend(loc = "upper right", fontsize = 8, frameon = True)
-    plt.tight_layout()
+        # Styling
+        plt.axhline(0, ls = '--', lw = 1)
+        plt.grid(True, alpha = 0.3)
+        plt.xlabel("Time (s)")
+        plt.ylabel("Passenger vertical acceleration (m/s^2)")
+        plt.title("Passenger acceleration convergence")
+        plt.legend(loc = "upper right", fontsize = 8, frameon = True)
+        plt.tight_layout()
+
+        plot_heave(ts, z)
+        plot_pitch(ts, theta)
+        plot_passenger_accel(ts, a_pass, seat_x,)
+        plot_pass_accel_conv(c_f_opt_new, c_r_opt_new)
+        plt.show()
