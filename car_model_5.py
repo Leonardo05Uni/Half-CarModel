@@ -54,23 +54,11 @@ class SimulationOptions:
 # Road profile, the CSV has column "distance" (m) and "height" (m)
 BaseInput = Callable[[float], Tuple[float, float, float, float]]
 
-# Import CSV
-def csv_reader(road_csv_path: str):
-    df = pd.read_csv(road_csv_path)
-    x = df["distance"].values # Distance labelled as x
-    y = df["height"].values # Road height labelled as y
-    return x, y
-
-# Smooth road profile y(x) using UnivariateSpline import 
-x, y = csv_reader("bumpy_road_cords.csv")
-
-spline = UnivariateSpline(x, y, s = 0.4) # s = 0.4 is used to define how smooth you want the curve to be, higher value more smooth
-dsdx = spline.derivative() # dy/dx for road inputs later
-
 # make_road_base function outputs the base(t) function which returns (yf, yr, yfdot, yrdot) as per the next bits of code
 def make_road_base(p: CarParams,
                    spline: UnivariateSpline,
                    dsdx: UnivariateSpline,
+                   x: np.ndarray,
                    v: float = 8.0,
                    x0: float = 0.0,
                    clamp: bool = True) -> BaseInput: # The clamp clips the car to act within the maximum and minimum values of the road
@@ -478,13 +466,11 @@ def damping_monte_carlo_error(p, base, opts_local, seat_x,
 
 # THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "MAIN SCRIPT" SHEET OF NOTES
 
+
 c_f_opt_seq = []
 c_r_opt_seq = []
 
-def main(p):
-
-    # Car travels along the measured road at a constant velocity of 8 m/s
-    road_base = make_road_base(p, spline, dsdx, v = 8.0, x0 = 0.0)
+def main(p, road_base):
 
     # Initial conditions: body height, wheels on the road, zero velocity
     y_f0, y_r0, _, _ = road_base(0.0)
@@ -582,7 +568,7 @@ def main(p):
                                                 z_dot, theta_dot, z_wf_dot, z_wr_dot, p, road_base)
             a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG = seat_x)
 
-            # Places the last itertion on top plus a slightly bolder alpha to make it clearer in graph
+            # Places the last iteration on top plus a slightly bolder alpha to make it clearer in graph
             plt.plot(ts, a_pass, lw = 1.1,
                     alpha = 1.0 if i == len(c_f_opt_new) else 0.8,
                     label = f"Step {i}: c_f={c_f:.0f}, c_r={c_r:.0f}  |  RMS={rms(a_pass):.3f} m/s^2")
@@ -596,8 +582,7 @@ def main(p):
         plt.legend(loc = "upper right", fontsize = 8, frameon = True)
         plt.tight_layout()
 
-        plot_heave(ts, z)
-        plot_pitch(ts, theta)
-        plot_passenger_accel(ts, a_pass, seat_x,)
-        plot_pass_accel_conv(c_f_opt_new, c_r_opt_new)
-        plt.show()
+    plot_heave(ts, z)
+    plot_pitch(ts, theta)
+    plot_passenger_accel(ts, a_pass, seat_x,)
+    plot_pass_accel_conv(c_f_opt_new, c_r_opt_new)
