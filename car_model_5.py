@@ -384,6 +384,10 @@ def optimise_damping(p, base, opts_local, seat_x,
                                c_r_range = (100, 3000),
                                N = 1):
 
+    # Local convergence history for 1 optimisation
+    c_f_opt_seq = []
+    c_r_opt_seq = []
+
     # Take initial guesses damping coefficients
     c_f_opt = 1000.0
     c_r_opt = 1000.0
@@ -404,7 +408,7 @@ def optimise_damping(p, base, opts_local, seat_x,
         c_r_opt_seq.append(c_r_opt)
 
     # Return optimised damping coefficient values
-    return c_f_opt, c_r_opt, c_f_opt_seq[-8:], c_r_opt_seq[-8:]
+    return c_f_opt, c_r_opt, np.array(c_f_opt_seq), np.array(c_r_opt_seq)
 
 
 # THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "OPTIMISATION (FINDING OPTIMAL DAMPING)" SHEET OF NOTES
@@ -466,9 +470,6 @@ def damping_monte_carlo_error(p, base, opts_local, seat_x,
 
 # THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "MAIN SCRIPT" SHEET OF NOTES
 
-
-c_f_opt_seq = []
-c_r_opt_seq = []
 
 def main(p, road_base):
 
@@ -563,7 +564,7 @@ def main(p, road_base):
 
             # Run the simulation each time for each c
             sol = run_simulation(p, road_base, opts)
-            ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 500)
+            ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts.t_span, n = 2000)
             z_dot_dot, theta_dot_dot, _, _ = accelerations_from_rhs(ts, z, theta, z_wf, z_wr,
                                                 z_dot, theta_dot, z_wf_dot, z_wr_dot, p, road_base)
             a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG = seat_x)

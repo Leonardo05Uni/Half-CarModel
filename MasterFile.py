@@ -3,20 +3,20 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
+np.random.seed(0)
+
 #=================Road Input==========================
 
 # Import CSV
 def csv_reader(road_path_csv: str):
     df = pd.read_csv(road_path_csv)
-    x = df["distance"].values  # Distance labelled as x
-    y = df["height"].values    # Road height labelled as y
+    x = df["distance"].values # Distance labelled as x
+    y = df["height"].values # Road height labelled as y
     return x, y
 
-
-#================Making the road profile from data==================
-
-# Choose which CSV you want here (this is your “small file” config point)
-road_csv = "bumpy_road_cords.csv"
+# Choose which Road CSV you want here
+road_csv = "motorway.csv"
 x, y = csv_reader(road_csv)
 
 spline = UnivariateSpline(x, y, s = 0.4)
