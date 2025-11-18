@@ -46,6 +46,6 @@ p = CarParams(
 #=================== run simulation starting here===================
 
 # Build the base(t) function for this road 
-road_base = make_road_base(p, spline, dsdx, x, v = 8.0, x0 = 0.0)
+road_base = make_road_base(p, spline, dsdx, x, v = 31.0, x0 = 0.0)
 main(p, road_base)
 plt.show()
