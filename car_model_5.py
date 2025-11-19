@@ -378,6 +378,39 @@ def dJ_dc_r(c_f, c_r, p, base, opts_local, seat_x):
     # Returns the differentiated J(cf)
     return (J_plus - J_minus) / (2 * h)
 
+
+# This function finds an optimal c in the case that root finding fails 
+# Root finding can fail in a road such as a motorway as there is not "too high" or "too low" c as it is flat
+# It will just pick a value of derivative that is closest to 0 
+def pick_optimal_c(f, a, b, N):
+
+    fa = f(a)
+    fb = f(b)
+
+    # If there is a sign change, we can safely use bisection method (as before)
+    if fa * fb < 0.0:
+        return bisection(f, a, b, N)
+
+    # If either endpoint already gives zero derivative, take it and use it
+    if fa == 0.0:
+        return a
+    if fb == 0.0:
+        return b
+
+    # Otherwise, derivative has the same sign on [a, b]:
+    # If derivative > 0 everywhere, J increases with c -> minimum at a
+    # If derivative < 0 everywhere, J decreases with c -> minimum at b
+    if fa > 0.0 and fb > 0.0:
+        # J increases with c, smallest J at lower bound
+        return a
+    if fa < 0.0 and fb < 0.0:
+        # J decreases with c, smallest J at upper bound
+        return b
+
+    # Fallback (should not really be hit, but just in case of numerical quirks)
+    return a if abs(fa) < abs(fb) else b
+
+
 # This function finds optimal cf and cr using the bisection root finding methods on the derivates of J(cf, cr)
 def optimise_damping(p, base, opts_local, seat_x,
                                c_f_range = (100, 3000),
@@ -397,12 +430,12 @@ def optimise_damping(p, base, opts_local, seat_x,
         # Optimise the front damping (fix rear)
         f_front = lambda c: dJ_dc_f(c, c_r_opt, p, base, opts_local, seat_x)
         a_f, b_f = c_f_range
-        c_f_opt = bisection(f_front, a_f, b_f, G)
+        c_f_opt = pick_optimal_c(f_front, a_f, b_f, G)
 
         # Optimise the rear damping (fix front)
         f_rear = lambda c: dJ_dc_r(c_f_opt, c, p, base, opts_local, seat_x)
         a_r, b_r = c_r_range
-        c_r_opt = bisection(f_rear, a_r, b_r, G)
+        c_r_opt = pick_optimal_c(f_rear, a_r, b_r, G)
 
         c_f_opt_seq.append(c_f_opt)
         c_r_opt_seq.append(c_r_opt)

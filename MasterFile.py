@@ -27,8 +27,8 @@ dsdx = spline.derivative()
 #in here you will need to call upon the road_profile module to generate the road profile and pass along parameters, then loop through all below code for each profile
 
 p = CarParams(
-    body_M = 1163 - (29 * 4), # body mass subtracting the wheel masses
-    body_inertia = 3000.0,
+    body_M = 1163 - (29 * 4), # Body mass subtracting the wheel masses
+    body_inertia = 3000.0, # Intertia of car body
     body_a = 0.996, # Distance from CG to front axle
     body_b = 1.494, # Distance from CG to rear axle
 
@@ -46,6 +46,7 @@ p = CarParams(
 #=================== run simulation starting here===================
 
 # Build the base(t) function for this road 
-road_base = make_road_base(p, spline, dsdx, x, v = 31.0, x0 = 0.0)
+# 31m/s is 69mph, 8m/s is 18mph
+road_base = make_road_base(p, spline, dsdx, x, v = 8.0, x0 = 0.0)
 main(p, road_base)
 plt.show()
