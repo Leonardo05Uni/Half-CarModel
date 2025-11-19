@@ -71,12 +71,6 @@ Main control script
 Diagram showing the simplified 2-DOF suspension layout.  
 - Front and rear wheel points are marked, along with the basic reference positions.
 
-### car_model_2.py  
-Main script for the 2-DOF car body model  
-- This is the main script where the 4-DOF car model runs  
-- It sets the mass, damping,tyre and stiffness values, calls the motion equations from `rhs_car()`  
-- Runs the simulation through `run_simulation()` using SciPy’s `solve_ivp`  
-
 ### car_model_5.py  
 More car model information added, includes:
 - wheel masses (`m_wf`, `m_wr`), tyre stiffness (`k_tf`, `k_tr`)
@@ -90,12 +84,7 @@ More car model information added, includes:
 - supports composite and spline-based surface construction
 - allows combination of potholes, surface roughness, and gradients for realistic road shapes
 - exports height data to `bumpy_road_cords.csv`
-- being imported in `MasterFile.py` to create realistic road inputs for the vehicle model
-
-### speed_bump.py  
-A quick test file for a single speed bump.  
-- It calculates the bump height `h(x)` and time-based `h_dot(x, speed)`  
-- to check how the suspension behaves at different car speeds
+- being imported in `MasterFile.py` to create realistic road inputs for the vehicle model  
 
 ### bumpy_road_cords.csv    
 Just a CSV file with two columns — distance and height (metres)  
@@ -151,7 +140,6 @@ Those two images displays the composition of unsprung mass and the tyre vertical
 **1. Open Masterfile.py and this model will automatically import all of the modules below:**
    - car_model_5.py
    - road_profile.py
-   - speed_bump.py
 
 **2. Python Libraries required:**  
    - `numpy`, `scipy`, `matplotlib`, `pandas`
@@ -162,7 +150,7 @@ Those two images displays the composition of unsprung mass and the tyre vertical
    pip install numpy scipy matplotlib pandas
 
 **3. What happens when the code is running?**  
-    (if Masterfile.py is not running, just open it manually following the instructions below:)  
+    (if Masterfile.py is not running, just open it manually following the instructions below instead of opening automatically by Masterfile.py:)  
    - First off, the script called `road_profile.py` would generate a road input —— `bumpy_road_cords.csv`
    - Secondly, it runs the dynamic model from `car_model_5.py` via `rhs_car()` by using `solve_ivp`
    - Then the RMS acceleration would be generated automatically
@@ -178,10 +166,11 @@ Those two images displays the composition of unsprung mass and the tyre vertical
 ## Numerical Methods Implementation  
 
 1. **Root finding**  
-   Location -- `Masterfile.py`, function: `find_equilibrium()`
-   
-   It solves the equation of the suspension system when it is at equilibrium state, when total force=0  
-   Uses the scipy.optimize.root_scalar() to determine the height of steady-state ride before dynamic simulation.  
+   Location -- `car_model_5.py`, function: `J(c)`  
+
+   J(c) defines the Root Mean Square Passenger Acceleration as a function of damping coefficient.
+   The Root Finding Method is aimed at finding out the root of $\frac{dJ}{dC}=0$.
+   Bisection Method is used by setting up $a$ and $b$ as two guessing roots when $f(a)f(b)<0$, then set $m=\frac{a+b}{2}$, when $f(a)f(m)<0$, $b=m$, $f(b)f(m)<0$, $a=m$ to minimize       the space between the intervals to find out the roots.
    
 3. **Ordinary Differential Equations (ODEs)**   
    Location -- `car_model_5.py`, function: `rhs_car()`
