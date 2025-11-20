@@ -42,6 +42,7 @@ Each wheel follows the input road profile independently, transmitting forces to 
 | 3,7 | RWC / FWC | Rear / Front Wheel Centre |
 | 4,8 | RWP / FWP | Rear / Front Wheel Connection (link) |
 | 9 | Body | Vehicle Sprung Mass (rigid body) |
+| 10，11 | KTR / KTF | Rear / Front Tyre Spring Stiffness |
 
 The **car body** is modeled as a rigid bar of mass \( M \) and rotational inertia \( I \).  
 Front and rear suspensions act as spring–damper pairs located at distances \( a \) and \( b \) from the CG.
