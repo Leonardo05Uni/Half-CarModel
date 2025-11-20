@@ -6,9 +6,9 @@ Nigel Cheung, Boming Xiao, Floris Hijink, Leonardo Maffei Mercalli, Dimitri Rao
 ## Overview
 The suspension system has a huge impact on how a car reacts to bumpy or uneven roads — it pretty much decides how stable and comfortable the ride feels.
 
-This project simulates a car travelling over a rough road to investigate how variations in spring stiffness and damping coefficients affect the vertical (heave) and rotational (pitch) motion of the vehicle.
+This project simulates a car travelling over different types of roads to investigate how variations in damping coefficients affect the dynamics of the vehicle.
 
-The simulation provides a physically meaningful representation of vehicle dynamics, which is focused on rideing comfort and vibration controlling through suspension tuning.  
+The simulation provides a physically meaningful representation of vehicle dynamics, which is focused on riding comfort through suspension tuning.  
 
 **The reallife example:**  
 Car: 2018 Ford Fiesta ST Line 5dr, 1.0L.  
@@ -19,7 +19,7 @@ https://media.ford.com/content/dam/fordmedia/Europe/documents/productReleases/Fi
 
 Our main goals are：  
 - Study how the road surface, tyres, suspension, and vehicle body interact with each other.  
-- Observe how stiffness and damping changes affect both vertical and angular accelerations.  
+- Observe how changes in damping affect both vertical and angular accelerations.  
 - Find a combination of parameters that gives the smoothest ride, using RMS acceleration as a measure of comfort.  
 
 ### System Component / Positions Names
@@ -59,7 +59,7 @@ Front and rear suspensions act as spring–damper pairs located at distances \( 
 ### MasterFile.py
 Main control script
 - imported parameters from `car_model_5.py`
-- imported road layout from "road_profile.py" and `speed_bump.py`
+- imported road layout from "road_profile.py"
 - set up the initial conditions
 - imported time integration through `run_simulation()`
 - performed Monte Carlo–based damping optimization by (`damping_monte_carlo_error`)  
@@ -68,7 +68,7 @@ Main control script
 - can be used for every road profile and car type by changing the parameters.
 
 ### Model drawing – car v2.png  
-Diagram showing the simplified 2-DOF suspension layout.  
+Diagram showing the simplified 4-DOF suspension layout.  
 - Front and rear wheel points are marked, along with the basic reference positions.
 
 ### car_model_5.py  
@@ -83,17 +83,15 @@ More car model information added, includes:
 - generates road profiles such as bumps and potholes using mathematical functions
 - supports composite and spline-based surface construction
 - allows combination of potholes, surface roughness, and gradients for realistic road shapes
-- exports height data to `bumpy_road_cords.csv`
+- exports height data to a corresponding CSV
 - being imported in `MasterFile.py` to create realistic road inputs for the vehicle model  
 
-### bumpy_road_cords.csv    
-Just a CSV file with two columns — distance and height (metres)  
-- It’s mainly for checking or plotting the road surface
- 
-### Two images  
-**image_2025-11-10_134556331.png / image_2025-11-10_134858877.png**  
+### Road Profiles Folder
+- These are screenshots of the pre-generated profile
 
-Those two images displays the composition of unsprung mass and the tyre vertical stiffness range (150-300 kN/m)  
+### Plots Folder
+- Screenshots of outputted graphs from each road
+- Aso including the optimised response of the vehicle
 
 ### Suffix Meaning
 
@@ -144,20 +142,7 @@ Those two images displays the composition of unsprung mass and the tyre vertical
 **2. Python Libraries required:**  
    - `numpy`, `scipy`, `matplotlib`, `pandas`
 
-   **How to install?**  
-   
-   Via pip:  
-   pip install numpy scipy matplotlib pandas
-
-**3. What happens when the code is running?**  
-    (if Masterfile.py is not running, just open it manually following the instructions below instead of opening automatically by Masterfile.py:)  
-   - First off, the script called `road_profile.py` would generate a road input —— `bumpy_road_cords.csv`
-   - Secondly, it runs the dynamic model from `car_model_5.py` via `rhs_car()` by using `solve_ivp`
-   - Then the RMS acceleration would be generated automatically
-   - At last the plottings including `Body Heave vs Time`, `Body Pitch vs Time`, `Passenger Vertical Accel (x={seat_x} m from CG)` and `Unsprung (wheel) accelerations`  
-     would be generated.
-
-**4. What if changing the road profile and car type?**
+**3. What if changing the road profile and car type?**
    - All the parameters can be changed in `Masterfile.py` maually, which means every road profile and car type would be simulated through our coding.  
    - For instance, by modifying the vehicle properties (mass, stiffness, damping, etc.) to match a specific car model, the program could automatically produce the corresponding
      simulated dynamic response for that vehicle.
@@ -172,13 +157,13 @@ Those two images displays the composition of unsprung mass and the tyre vertical
    The Root Finding Method is aimed at finding out the root of $\frac{dJ}{dC}=0$.
    Bisection Method is used by setting up $a$ and $b$ as two guessing roots when $f(a)f(b)<0$, then set $m=\frac{a+b}{2}$, when $f(a)f(m)<0$, $b=m$, $f(b)f(m)<0$, $a=m$ to minimize       the space between the intervals to find out the roots.
    
-3. **Ordinary Differential Equations (ODEs)**   
+2. **Ordinary Differential Equations (ODEs)**   
    Location -- `car_model_5.py`, function: `rhs_car()`
    
    Defines the governing motion equations for the car model including heave, pitch and wheel vertical motion. etc.  
    Integrated over time by using `scipy.integrate.solve_ivp` with RK45 Method.  
 
-5. **Interpolation**  
+3. **Interpolation**  
    Location -- `road_profile.py`, function: `generate_bumpy_road()`  
 
    It uses interpolation techniques (`scipy.interpolate.interp1d`) to make the height points of discrete road smoother.  
