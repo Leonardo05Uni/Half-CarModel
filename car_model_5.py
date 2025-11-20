@@ -330,7 +330,7 @@ def bisection(f, a, b, N): # N is the number of iterations
 def passenger_rms_for_damping(c_f, c_r, p, base, opts_local, seat_x):
 
     # Set parameters to our CarParams except for the damping which we are inputting ourselves
-    pars = CarParams(
+    p = CarParams(
         body_M = p.body_M,
         body_inertia = p.body_inertia,
         body_a = p.body_a,
@@ -346,11 +346,11 @@ def passenger_rms_for_damping(c_f, c_r, p, base, opts_local, seat_x):
     )
 
     # Run the solver to uniformly distribut positions and velocities later with sample_states
-    sol = run_simulation(pars, base, opts_local)
+    sol = run_simulation(p, base, opts_local)
     ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot = sample_states(sol, opts_local.t_span, n = 300)
 
     # Find car body accelerations from the function to use in finding the acceleration of the passenger distance x from CG
-    z_dot_dot, theta_dot_dot, _, _ = accelerations_from_rhs(ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot, pars, base)
+    z_dot_dot, theta_dot_dot, _, _ = accelerations_from_rhs(ts, z, theta, z_wf, z_wr, z_dot, theta_dot, z_wf_dot, z_wr_dot, p, base)
     a_pass = occupant_vertical_accel(z_dot_dot, theta_dot_dot, x_from_CG=seat_x)
     # Return the RMS of the passenger accel
     return rms(a_pass)
@@ -465,7 +465,7 @@ def damping_monte_carlo_error(p, base, opts_local, seat_x,
         scale_kf = np.random.uniform(1 - rel_variation, 1 + rel_variation)
         scale_kr = np.random.uniform(1 - rel_variation, 1 + rel_variation)
 
-        pars = CarParams(
+        p = CarParams(
             body_M = p.body_M * scale_M,
             body_inertia = p.body_inertia,
             body_a = p.body_a,
@@ -481,7 +481,7 @@ def damping_monte_carlo_error(p, base, opts_local, seat_x,
         )
 
         # Find the new optimum for this random setup
-        c_f_ran, c_r_ran, _, _ = optimise_damping(pars, base, opts_local, seat_x)
+        c_f_ran, c_r_ran, _, _ = optimise_damping(p, base, opts_local, seat_x)
         c_f_samples.append(c_f_ran)
         c_r_samples.append(c_r_ran)
 
