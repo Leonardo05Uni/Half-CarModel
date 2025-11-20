@@ -4,6 +4,8 @@
 Nigel Cheung, Boming Xiao, Floris Hijink, Leonardo Maffei Mercalli, Dimitri Rao  
 
 ## Overview
+Warning - This code takes around 5 minutes to run
+
 The suspension system has a huge impact on how a car reacts to bumpy or uneven roads — it pretty much decides how stable and comfortable the ride feels.
 
 This project simulates a car travelling over different types of roads to investigate how variations in damping coefficients affect the dynamics of the vehicle.
