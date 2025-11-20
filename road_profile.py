@@ -130,9 +130,6 @@ def plot_road(df, x_base, y_base):
 # df, x, y, bumps, potholes = generate_bumpy_road(csv_name='bumpy_road.csv',length=100, resolution=0.01, incline=0,bump_height=0.1, bump_width=1.2, pothole_depth=0.1, pothole_width=2, num_bumps=2, num_potholes=2, imperfection=0.01)
 # plot_road(df, x, y)
 
-# df, x, y, bumps, potholes = generate_bumpy_road(csv_name='speedbump.csv',length=10, resolution=0.1, incline=0, bump_height=0.1, bump_width=1.2, pothole_depth=0.1, pothole_width=2, num_bumps=1, num_potholes=0, imperfection=0)
-# plot_road(df, x, y)
-
 # df, x, y, bumps, potholes = generate_bumpy_road(csv_name='motorway.csv',length=100, resolution=0.01, incline=0, bump_height=0.1, bump_width=1.2, pothole_depth=0.1, pothole_width=2, num_bumps=0, num_potholes=1, imperfection=0.01)                       
 # plot_road(df, x, y)
 
