@@ -1,28 +1,41 @@
 # CMM-Group9
 ## Group Members:  
 
-Floris Hijink, Leonardo Maffei Mercalli, Dimitri Rao  
+Nigel Cheung, Boming Xiao, Floris Hijink, Leonardo Maffei Mercalli, Dimitri Rao  
 
 ## Overview
-Warning - This code takes around 5 minutes to run
 
-The suspension system has a huge impact on how a car reacts to bumpy or uneven roads — it pretty much decides how stable and comfortable the ride feels.
+This code takes several minutes to run because each Monte Carlo trial repeats
+the damping optimisation. The sample count can be configured in
+`MasterFile.py`; 20 samples are used by default.
+
+The suspension system has a major influence on how a car reacts to bumpy or
+uneven roads, affecting both vehicle stability and passenger comfort.
 
 This project simulates a car travelling over different types of roads to investigate how variations in damping coefficients affect the dynamics of the vehicle.
 
 The simulation provides a physically meaningful representation of vehicle dynamics, which is focused on riding comfort through suspension tuning.  
 
-**The reallife example:**  
+**Reference vehicle:**  
 Car: 2018 Ford Fiesta ST Line 5dr, 1.0L.  
 https://media.ford.com/content/dam/fordmedia/Europe/documents/productReleases/Fiesta/FordFiesta2017_FiestaDrive_TechSpecs_EU.pdf 
 
 
-### Project Objectives  
+### Project Objectives
 
 Our main goals are：  
 - Study how the road surface, tyres, suspension, and vehicle body interact with each other.  
 - Observe how changes in damping affect both vertical and angular accelerations.  
 - Find a combination of parameters that gives the smoothest ride, using RMS acceleration as a measure of comfort.  
+
+## Individual Contribution
+
+Leonardo Maffei Mercalli developed the mathematical background and authored
+`MasterFile.py` and `car_model_5.py`, including the coupled equations of motion,
+ODE integration, damping optimisation, Monte Carlo parameter-sensitivity
+analysis, modal calculations, passenger-acceleration evaluation and plotting.
+The road-profile module and wider project documentation were completed
+collaboratively within the five-person team.
 
 ### System Component / Positions Names
 (number reference those found in figure 1 on `Model drawing - car v2.png`)  
@@ -65,8 +78,8 @@ Main control script
 - imported road layout from "road_profile.py"
 - set up the initial conditions
 - imported time integration through `run_simulation()`
-- performed Monte Carlo–based damping optimization by (`damping_monte_carlo_error`)  
-- computed RMS accelerations and ISO 2631-1 comfort levels
+- performed bisection-based damping optimisation and Monte Carlo parameter-sensitivity analysis using `damping_monte_carlo_error()`  
+- computed RMS accelerations for comparison with published ride-comfort ranges
 - generated plots including `Body Heave vs Time`, `Body Pitch vs Time`, `Passenger Vertical Accel (x={seat_x} m from CG)` and `Unsprung (wheel) accelerations`.
 - can be used for every road profile and car type by changing the parameters.
 
@@ -146,7 +159,7 @@ More car model information added, includes:
    - `numpy`, `scipy`, `matplotlib`, `pandas`
 
 **3. What if changing the road profile and car type?**
-   - All the parameters can be changed in `Masterfile.py` maually, which means every road profile and car type would be simulated through our coding.  
+   - All parameters can be changed manually in `MasterFile.py`, allowing different vehicle specifications and road profiles to be simulated.  
    - For instance, by modifying the vehicle properties (mass, stiffness, damping, etc.) to match a specific car model, the program could automatically produce the corresponding
      simulated dynamic response for that vehicle.
 
@@ -171,6 +184,16 @@ More car model information added, includes:
 
    It uses interpolation techniques (`scipy.interpolate.interp1d`) to make the height points of discrete road smoother.  
    It generates continuous road surfaces including bumps, potholes and random roughness.  
+
+4. **Monte Carlo parameter-sensitivity analysis**
+   Location -- `car_model_5.py`, function: `damping_monte_carlo_error()`
+
+   Each trial independently perturbs the nominal sprung mass and front/rear
+   spring stiffnesses by ±5%, then repeats the damping optimisation. A fixed
+   random seed makes results reproducible. The output reports the mean,
+   standard deviation and empirical 95% interval of the optimal front and rear
+   damping coefficients. The number of trials is configurable in
+   `MasterFile.py`.
    
    
 
@@ -182,7 +205,12 @@ $$
 a_{RMS} = \sqrt{\frac{1}{T} \int_0^T [a(t)]^2 \, dt}
 $$
 
-### ISO 2631-1 Ride Comfort Classification
+### Indicative ISO 2631-1 Ride Comfort Ranges
+
+The ranges below provide useful context for the RMS acceleration results.
+However, this model currently uses unweighted vertical acceleration; a formal
+ISO 2631-1 assessment would additionally require the specified frequency
+weighting and exposure-duration treatment.
 
 | **RMS Acceleration (m/s²)** | **Comfort Level (ISO 2631-1)**      |
 |-----------------------------:|:------------------------------------|
@@ -201,8 +229,6 @@ $$
 - **Wheel hub motion:** `z_wf(t)`, `z_wr(t)`  
 - **Passenger acceleration:** `a_pass(t)`  
 - **RMS comfort results and plots** 
-
-
 
 
 
