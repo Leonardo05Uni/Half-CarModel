@@ -4,8 +4,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-np.random.seed(0)
-
 #=================Road Input==========================
 
 # Import CSV
@@ -48,5 +46,8 @@ p = CarParams(
 # Build the base(t) function for this road 
 # 31m/s is 69mph, 8m/s is 18mph
 road_base = make_road_base(p, spline, dsdx, x, v = 8.0, x0 = 0.0)
-main(p, road_base)
+
+# Increase mc_samples for a more stable uncertainty distribution. Twenty
+# samples provide a practical default; smaller values are useful while testing.
+main(p, road_base, mc_samples = 20, mc_seed = 0)
 plt.show()
