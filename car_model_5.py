@@ -444,67 +444,127 @@ def optimise_damping(p, base, opts_local, seat_x,
     return c_f_opt, c_r_opt, np.array(c_f_opt_seq), np.array(c_r_opt_seq)
 
 
-# THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "OPTIMISATION (FINDING OPTIMAL DAMPING)" SHEET OF NOTES
+# THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE
+# "OPTIMISATION (FINDING OPTIMAL DAMPING)" SHEET OF NOTES
 
 
-# The Monte Carlo error approximation is a function I wrote as a personal project some time ago
-# It is a method of estimating error when the true value is unknown
+@dataclass
+class DampingMonteCarloResult:
+    """Summary of the damping optimisation under parameter uncertainty."""
+
+    c_f_nominal: float
+    c_r_nominal: float
+    c_f_mean: float
+    c_r_mean: float
+    c_f_std: float
+    c_r_std: float
+    c_f_interval: Tuple[float, float]
+    c_r_interval: Tuple[float, float]
+    c_f_samples: np.ndarray
+    c_r_samples: np.ndarray
+    c_f_convergence: np.ndarray
+    c_r_convergence: np.ndarray
+
+
 def damping_monte_carlo_error(p, base, opts_local, seat_x,
-                                 n_samples = 4, rel_variation = 0.05):
+                              n_samples = 20,
+                              rel_variation = 0.05,
+                              confidence = 0.95,
+                              seed = 0):
+    """Estimate how uncertain vehicle parameters affect optimal damping.
 
-    c_f_opt_nom, c_r_opt_nom, c_f_list, c_r_list = optimise_damping(p, base, opts_local, seat_x)
+    Each trial independently perturbs the nominal sprung mass and front/rear
+    spring stiffnesses by a uniform relative variation. The damping
+    optimisation is then repeated for that sampled vehicle. The resulting
+    distribution describes sensitivity of the optimal damping coefficients to
+    parameter uncertainty; it is not numerical integration error.
+    """
 
-    # Start by taking N samples of the values you are trying to find
-    c_f_samples = []
-    c_r_samples = []
+    if n_samples < 5:
+        raise ValueError("n_samples must be at least 5")
+    if not 0.0 < rel_variation < 1.0:
+        raise ValueError("rel_variation must lie between 0 and 1")
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must lie between 0 and 1")
 
-    for _ in range(n_samples):
+    # Preserve one immutable nominal parameter set. In the original routine,
+    # perturbations accumulated because each sample was based on the previous
+    # sample rather than on the same nominal vehicle.
+    p_nominal = CarParams(
+        body_M = p.body_M,
+        body_inertia = p.body_inertia,
+        body_a = p.body_a,
+        body_b = p.body_b,
+        FWS_k = p.FWS_k,
+        FWD_c = p.FWD_c,
+        RWS_k = p.RWS_k,
+        RWD_c = p.RWD_c,
+        m_wf = p.m_wf,
+        m_wr = p.m_wr,
+        k_tf = p.k_tf,
+        k_tr = p.k_tr
+    )
 
-        # Random +-5% changes of mass and spring stiffness
-        scale_M = np.random.uniform(1 - rel_variation, 1 + rel_variation)
-        scale_kf = np.random.uniform(1 - rel_variation, 1 + rel_variation)
-        scale_kr = np.random.uniform(1 - rel_variation, 1 + rel_variation)
+    c_f_nominal, c_r_nominal, c_f_history, c_r_history = optimise_damping(
+        p_nominal, base, opts_local, seat_x
+    )
 
-        p = CarParams(
-            body_M = p.body_M * scale_M,
-            body_inertia = p.body_inertia,
-            body_a = p.body_a,
-            body_b = p.body_b,
-            FWS_k = p.FWS_k * scale_kf,
-            FWD_c = p.FWD_c,
-            RWS_k = p.RWS_k * scale_kr,
-            RWD_c = p.RWD_c,
-            m_wf = p.m_wf,
-            m_wr = p.m_wr,
-            k_tf = p.k_tf,
-            k_tr = p.k_tr
+    rng = np.random.default_rng(seed)
+    c_f_samples = np.empty(n_samples, dtype = float)
+    c_r_samples = np.empty(n_samples, dtype = float)
+
+    for i in range(n_samples):
+        scale_M, scale_kf, scale_kr = rng.uniform(
+            1.0 - rel_variation,
+            1.0 + rel_variation,
+            size = 3
         )
 
-        # Find the new optimum for this random setup
-        c_f_ran, c_r_ran, _, _ = optimise_damping(p, base, opts_local, seat_x)
-        c_f_samples.append(c_f_ran)
-        c_r_samples.append(c_r_ran)
+        p_sample = CarParams(
+            body_M = p_nominal.body_M * scale_M,
+            body_inertia = p_nominal.body_inertia,
+            body_a = p_nominal.body_a,
+            body_b = p_nominal.body_b,
+            FWS_k = p_nominal.FWS_k * scale_kf,
+            FWD_c = p_nominal.FWD_c,
+            RWS_k = p_nominal.RWS_k * scale_kr,
+            RWD_c = p_nominal.RWD_c,
+            m_wf = p_nominal.m_wf,
+            m_wr = p_nominal.m_wr,
+            k_tf = p_nominal.k_tf,
+            k_tr = p_nominal.k_tr
+        )
 
-    # Convert to arrays and compute Standard errors
-    c_f_samples = np.array(c_f_samples)
-    c_r_samples = np.array(c_r_samples)
+        c_f_samples[i], c_r_samples[i], _, _ = optimise_damping(
+            p_sample, base, opts_local, seat_x
+        )
 
-    cf_mean = np.mean(c_f_samples)
-    cr_mean = np.mean(c_r_samples)
+    alpha = 0.5 * (1.0 - confidence)
+    percentiles = [100.0 * alpha, 100.0 * (1.0 - alpha)]
 
-    s2_cf = np.sum((c_f_samples - cf_mean)**2) / (n_samples - 1)
-    s2_cr = np.sum((c_r_samples - cr_mean)**2) / (n_samples - 1)
+    c_f_interval = np.percentile(c_f_samples, percentiles)
+    c_r_interval = np.percentile(c_r_samples, percentiles)
 
-    se_cf = np.sqrt(s2_cf / n_samples)
-    se_cr = np.sqrt(s2_cr / n_samples)
-
-    return c_f_opt_nom, c_r_opt_nom, se_cf, se_cr, c_f_list, c_r_list
+    return DampingMonteCarloResult(
+        c_f_nominal = c_f_nominal,
+        c_r_nominal = c_r_nominal,
+        c_f_mean = float(np.mean(c_f_samples)),
+        c_r_mean = float(np.mean(c_r_samples)),
+        c_f_std = float(np.std(c_f_samples, ddof = 1)),
+        c_r_std = float(np.std(c_r_samples, ddof = 1)),
+        c_f_interval = tuple(float(value) for value in c_f_interval),
+        c_r_interval = tuple(float(value) for value in c_r_interval),
+        c_f_samples = c_f_samples,
+        c_r_samples = c_r_samples,
+        c_f_convergence = c_f_history,
+        c_r_convergence = c_r_history
+    )
 
 
 # THIS NEXT SECTION OF THE CODE IS EXPLAINED IN THE "MAIN SCRIPT" SHEET OF NOTES
 
 
-def main(p, road_base):
+def main(p, road_base, mc_samples = 20, mc_seed = 0):
 
     # Initial conditions: body height, wheels on the road, zero velocity
     y_f0, y_r0, _, _ = road_base(0.0)
@@ -522,11 +582,19 @@ def main(p, road_base):
     # Passenger position (m) forward of CG
     seat_x = 0.8
 
-    # Optimisation (root finding with bisection) + Monte Carlo error to give optimised damping coefficient and error
-    c_f_opt, c_r_opt, se_cf, se_cr, c_f_opt_new, c_r_opt_new = damping_monte_carlo_error(
-    p, road_base, opts_opt, seat_x,
-    n_samples = 4, rel_variation = 0.05
+    # Nominal optimisation plus Monte Carlo parameter sensitivity analysis
+    mc_result = damping_monte_carlo_error(
+        p, road_base, opts_opt, seat_x,
+        n_samples = mc_samples,
+        rel_variation = 0.05,
+        confidence = 0.95,
+        seed = mc_seed
     )
+
+    c_f_opt = mc_result.c_f_nominal
+    c_r_opt = mc_result.c_r_nominal
+    c_f_opt_new = mc_result.c_f_convergence
+    c_r_opt_new = mc_result.c_r_convergence
 
     # Update parameters to the optimal values
     p.FWD_c = c_f_opt
@@ -540,9 +608,23 @@ def main(p, road_base):
     print("Body modal properties (with optimised damping):")
     print(f"Mode 1 (bounce-ish): f = {freqs_hz[0]:.2f} Hz, damping ratio = {zetas[0]:.3f}")
     print(f"Mode 2 (pitch-ish) : f = {freqs_hz[1]:.2f} Hz, damping ratio = {zetas[1]:.3f}")
-    print(f"Std. error front = {se_cf:.2f} rear = {se_cr:.2f} Ns/m")
-    print(f"95% CI front: {c_f_opt:.1f} +- {1.96*se_cf:.2f}")
-    print(f"95% CI rear : {c_r_opt:.1f} +- {1.96*se_cr:.2f}\n")
+    print(f"Monte Carlo samples: {mc_samples} (seed={mc_seed})")
+    print(
+        f"Front optimum under uncertainty: mean={mc_result.c_f_mean:.1f}, "
+        f"SD={mc_result.c_f_std:.1f} Ns/m"
+    )
+    print(
+        f"Rear optimum under uncertainty : mean={mc_result.c_r_mean:.1f}, "
+        f"SD={mc_result.c_r_std:.1f} Ns/m"
+    )
+    print(
+        "95% empirical interval front: "
+        f"[{mc_result.c_f_interval[0]:.1f}, {mc_result.c_f_interval[1]:.1f}] Ns/m"
+    )
+    print(
+        "95% empirical interval rear : "
+        f"[{mc_result.c_r_interval[0]:.1f}, {mc_result.c_r_interval[1]:.1f}] Ns/m\n"
+    )
 
     # Final simulation using optimal damping
     sol = run_simulation(p, road_base, opts)
