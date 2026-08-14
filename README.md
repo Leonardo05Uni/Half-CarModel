@@ -1,7 +1,7 @@
 # CMM-Group9
 ## Group Members:  
 
-Nigel Cheung, Boming Xiao, Floris Hijink, Leonardo Maffei Mercalli, Dimitri Rao  
+Floris Hijink, Leonardo Maffei Mercalli, Dimitri Rao  
 
 ## Overview
 Warning - This code takes around 5 minutes to run
